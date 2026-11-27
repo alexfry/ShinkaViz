@@ -154,8 +154,8 @@ const trackMat=lineMat(),wireMat=lineMat(),stationMat=lineMat(),contourMat=lineM
 
 /* ---------- static network ---------- */
 const TRK=[.16,.62,1.0],sT=new Seg(),sW=new Seg(),sS=new Seg(),sC=new Seg();
-for(const dr of[1,-1])for(const g of[-.7175,.7175]){const off=dr*2.15+g;let p=sp(0,off);for(let i=1;i<=N;i++){const q=sp(i,off);sT.add(p,q,mul(TRK,(TUN[i]||TUN[i-1])?.16:1.3));p=q;}}
-for(let k=0;k<NS;k++)for(const dr of[1,-1])for(const e of stations[k].major?[5,14]:[5])for(const g of[-.7175,.7175]){let p=null,pa=0;for(let s=PC[k]-620;s<=PC[k]+620;s+=20){const a=loopAmt(Math.abs(s-PC[k])),q=at(s,dr*(2.15+e*a)+g,[0,0,0]);if(p&&(a>.002||pa>.002))sT.add(p,q,mul(TRK,1.1));p=q;pa=a;}}
+for(const dr of[1,-1])for(const g of[-.75,.75]){const off=dr*2.15+g;let p=sp(0,off);for(let i=1;i<=N;i++){const q=sp(i,off);sT.add(p,q,mul(TRK,(TUN[i]||TUN[i-1])?.16:1.3));p=q;}}
+for(let k=0;k<NS;k++)for(const dr of[1,-1])for(const e of stations[k].major?[5,14]:[5])for(const g of[-.75,.75]){let p=null,pa=0;for(let s=PC[k]-620;s<=PC[k]+620;s+=20){const a=loopAmt(Math.abs(s-PC[k])),q=at(s,dr*(2.15+e*a)+g,[0,0,0]);if(p&&(a>.002||pa>.002))sT.add(p,q,mul(TRK,1.1));p=q;pa=a;}}
 const PLAT=[.5,.56,.65];
 for(let k=0;k<NS;k++){for(const dr of[1,-1]){const o1=8.9,o2=stations[k].major?14.4:12.9,a0=PC[k]-215,a1=PC[k]+215;
   for(const o of[o1,o2])for(const h of[1.25,5.2]){const c=h>2?mul(PLAT,.35):PLAT;let p=at(a0,dr*o,[0,0,0]);p[1]+=h;for(let s=a0+15;s<=a1+1e-6;s+=15){const q=at(s,dr*o,[0,0,0]);q[1]+=h;sS.add(p,q,c);p=q;}}
@@ -214,16 +214,20 @@ const TAB_T=[[0,.7],[.36,.97],[.72,1.11],[1.08,1.28],[1.44,1.4],[1.8,1.54],[2.16
 const TAB_C=[[3.7,0],[4,.12],[4.5,.25],[5,.31],[5.5,.35],[6,.37],[6.5,.38],[7,.36],[7.5,.33],[8,.27],[8.5,.19],[9,.1],[9.7,0]];
 const TAB_B=[[0,.64],[.36,.48],[.72,.43],[1.08,.38],[1.44,.32],[15,.32]];
 function tab(T,d){if(d<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(d<=T[i][0]){const [d0,v0]=T[i-1],[d1,v1]=T[i];return v0+(v1-v0)*(d-d0)/(d1-d0);}return T[T.length-1][1];}
+function bogiesOf(len,nf,nr){return nf?[len/2-5.7,len/2-23.23]:nr?[-len/2+5.7,-len/2+23.23]:[-8.75,8.75];}
 function noseD(x,len,nf,nr){if(nf&&x>len/2-LN)return len/2-x;if(nr&&x<-len/2+LN)return x+len/2;return LN;}
 /* section params: [full width, underside, top (no canopy), canopy rise, d, waist height, lower exponent] */
-function prof(x,len,nf,nr){const d=Math.max(0,noseD(x,len,nf,nr)),yb=tab(TAB_B,d),yt=tab(TAB_T,d);
- return [2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb+.43*(yt-yb),3+6*(d>=8?1:(d/8)*(d/8)*(3-2*d/8))];}
+function prof(x,len,nf,nr){const d=Math.max(0,noseD(x,len,nf,nr)),yb0=tab(TAB_B,d),yt=tab(TAB_T,d);let yb=yb0;
+ for(const xb of bogiesOf(len,nf,nr)){const u=Math.abs(x-xb)/2.1;if(u<1)yb=Math.max(yb,.32+.48*Math.sqrt(1-u*u));}
+ return [2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb0+.43*(yt-yb0),3+6*(d>=8?1:(d/8)*(d/8)*(3-2*d/8))];}
 function sec(th,p,gr){const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?NU:p[6],b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,14);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
 /* point on the upper surface at lateral offset z (canopy included) */
 function topAt(p,z,gr){const a=p[0]/2+gr,q=Math.min(.999,Math.abs(z)/a),u=Math.pow(1-Math.pow(q,NU),1/NU),b=p[2]-p[5]+gr,s=Math.pow(u,NU/2);return p[5]+b*u+p[3]*Math.pow(s,14);}
 function carGeo(len,nf,nr){const xs=[],NK=48;
  if(nr)for(let k=0;k<=NK;k++)xs.push(-len/2+LN*Math.pow(k/NK,1.6));else xs.push(-len/2);
  if(nf)for(let k=NK;k>=0;k--)xs.push(len/2-LN*Math.pow(k/NK,1.6));else xs.push(len/2);
+ for(const xb of bogiesOf(len,nf,nr))for(let k=-9;k<=9;k++)xs.push(xb+k*.25);
+ xs.sort((a,b)=>a-b);for(let i=xs.length-1;i>0;i--)if(xs[i]-xs[i-1]<.05)xs.splice(i,1);
  const pos=[],idx=[];for(const x of xs){const p=prof(x,len,nf,nr);for(let m=0;m<MR;m++){const q=sec(m/MR*Math.PI*2,p,0);pos.push(x,q[1],q[0]);}}
  const R=xs.length;for(let r=0;r<R-1;r++)for(let m=0;m<MR;m++){const a=r*MR+m,b=r*MR+(m+1)%MR,c=(r+1)*MR+(m+1)%MR,d=(r+1)*MR+m;idx.push(a,d,c,a,c,b);}
  const p0=prof(xs[0],len,nf,nr),p1=prof(xs[R-1],len,nf,nr),c0=pos.length/3;pos.push(xs[0],(p0[1]+p0[2])/2,0,xs[R-1],(p1[1]+p1[2])/2,0);
@@ -262,11 +266,11 @@ function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  if(nf||nr)nose();
  along(0,mul(HB,.5));along(Math.PI,mul(HB,.5));                  /* waist */
  /* bogies: 2.5 m wheelbase; end cars 5.7 m and 23.2 m from the tip, others 17.5 m centres. Wheels show through skirt cut-outs. */
- const bog=nf?[xAt(5.7),xAt(23.23)]:nr?[xAt(5.7),xAt(23.23)]:[-8.75,8.75];
- for(const xb of bog)for(const sd of[-1,1]){const zs=sd*(P(xb)[0]/2+.02),c=HG;
-  let p=null;for(let k=0;k<=16;k++){const an=Math.PI*k/16,q=[xb-2.1*Math.cos(an),.32+.5*Math.sin(an),zs];if(p)S.add(p,q,mul(HB,.6));p=q;}
-  for(const ax of[-1.25,1.25]){let p=null;for(let k=0;k<=16;k++){const an=k/16*Math.PI*2,q=[xb+ax+Math.cos(an)*.43,.43+Math.sin(an)*.43,zs*.98];if(p)S.add(p,q,c);p=q;}}
-  S.add([xb-1.6,.4,zs*.98],[xb+1.6,.4,zs*.98],c);}
+ for(const xb of bogiesOf(len,nf,nr))for(const sd of[-1,1]){const zs=sd*(P(xb)[0]/2+.02),c=mul(HG,1.4);
+  let p=null;for(let k=0;k<=16;k++){const an=Math.PI*k/16,q=[xb-2.1*Math.cos(an),.32+.48*Math.sin(an),zs];if(p)S.add(p,q,mul(HB,.6));p=q;}
+  for(const ax of[-1.25,1.25]){let p=null;for(let k=0;k<=20;k++){const an=k/20*Math.PI*2,q=[xb+ax+Math.cos(an)*.43,.43+Math.sin(an)*.43,sd*.75];if(p)S.add(p,q,c);p=q;}
+   S.add([xb+ax,.43,sd*.75],[xb+ax,.43,sd*1.05],mul(HG,.8));}
+  const fz=sd*1.05,fc=mul(HG,.9);S.add([xb-1.55,.3,fz],[xb+1.55,.3,fz],fc);S.add([xb-1.55,.62,fz],[xb+1.55,.62,fz],fc);S.add([xb-1.55,.3,fz],[xb-1.55,.62,fz],fc);S.add([xb+1.55,.3,fz],[xb+1.55,.62,fz],fc);}
  if(px!==null){const c=mul(HPn,1.4),y0=3.76;for(const sd of[-1,1])S.add([px-.8,y0,sd*.5],[px+.8,y0,sd*.5],c);S.add([px-.8,y0,-.5],[px-.8,y0,.5],c);S.add([px+.8,y0,-.5],[px+.8,y0,.5],c);
   for(const sd of[-.12,.12]){S.add([px+.7,y0+.05,sd],[px-.9,4.4,sd],c);S.add([px-.9,4.4,sd],[px+.25,4.97,sd],c);}
   S.add([px+.25,4.97,-.8],[px+.25,4.97,.8],mul(HPn,2));S.add([px+.25,4.97,.8],[px+.25,4.84,1.02],c);S.add([px+.25,4.97,-.8],[px+.25,4.84,-1.02],c);}
@@ -397,11 +401,15 @@ const heroHead=()=>hs0.s+hero.dir*hero.len/2;
 function beside(s,extra,dy,out){const l=latFor(hero,s);at(s,l+hero.dir*extra*cine.side,out);out[1]+=dy;return out;}
 function onTrain(s,dy,out){at(s,latFor(hero,s),out);out[1]+=dy;return out;}
 function findPortal(){const i0=Math.round(heroHead()/DS);for(let j=12;j<=40;j++){const i=i0+hero.dir*j,b=i-hero.dir;if(i<1||i>=N)break;if(TUN[i]&&!TUN[b])return i*DS;}return null;}
+/* camera moves for otherwise-static shots: [along the direction of travel, towards the track (-) / away (+), up] in m/s, eased in */
+const Q3=[0,0,0];
+function moved(t){const o=trk(cine.sb),mv=cine.mv,te=t*t/(t+1.5),fx=o.tx*hero.dir,fz=o.tz*hero.dir,sg=hero.dir*cine.side,ox=o.tz*sg,oz=-o.tx*sg;
+ Q3[0]=cine.p[0]+fx*mv[0]*te+ox*mv[1]*te;Q3[1]=cine.p[1]+mv[2]*te;Q3[2]=cine.p[2]+fz*mv[0]*te+oz*mv[1]*te;return Q3;}
 const tele=d=>Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));
 const SHOTS={
  flyby:{ja:'通過',en:'Flyby',ok:()=>hs0.stop<0,
-  start(){let s=heroHead()+hero.dir*(260+Math.random()*200);for(let k=0;k<12&&TUN[trk(s).i];k++)s+=hero.dir*300;cine.s=Math.min(Math.max(s,50),LEN-50);beside(cine.s,12+Math.random()*12,1.5+Math.random()*4,cine.p);},
-  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=Math.min(55,Math.max(22,tele(cam.position.distanceTo(T))));return hero.dir*(heroHead()-cine.s)>120||t>9;}},
+  start(){let s=heroHead()+hero.dir*(260+Math.random()*200);for(let k=0;k<12&&TUN[trk(s).i];k++)s+=hero.dir*300;cine.s=Math.min(Math.max(s,50),LEN-50);const mv=[[7+Math.random()*4,0,.3],[1.5,0,1.8+Math.random()*.8],[2,0,-1.6],[2.5,-2.2,.15]][Math.random()*4|0];cine.mv=mv;cine.sb=cine.s;beside(cine.s,(mv[1]<0?18:12)+Math.random()*10,mv[2]<0?9+Math.random()*4:1.5+Math.random()*3,cine.p);},
+  upd(t){cam.position.fromArray(moved(t));T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=Math.min(55,Math.max(22,tele(cam.position.distanceTo(T))));return hero.dir*(heroHead()-cine.s)>120||t>9;}},
  track:{ja:'並走',en:'Tracking',ok:()=>hs0.stop<0,start(){cine.u=Math.random()<.5?0:1;},
   upd(t){const f=Math.min(1,t/10),u=cine.u?1-f:f,s=heroHead()-hero.dir*hero.len*(.95-.85*u);cam.position.fromArray(beside(s,13,2.2,Q));T.fromArray(onTrain(s+hero.dir*35,1.8,Q2));cam.fov=40;return t>10;}},
  catch:{ja:'追いつく',en:'Aerial, catching up',ok:()=>hs0.stop<0&&hs0.v>40,
@@ -417,14 +425,14 @@ const SHOTS={
  top:{ja:'真上',en:'Overhead',ok:()=>true,start(){},
   upd(t){onTrain(hs0.s,0,Q);cam.position.set(Q[0]-HP0.fx*60,Q[1]+240-t*4,Q[2]-HP0.fz*60);T.fromArray(Q);cam.fov=38;return t>8;}},
  portal:{ja:'トンネル',en:'Tunnel portal',ok:()=>hs0.stop<0&&findPortal()!==null,
-  start(){cine.s=findPortal();beside(cine.s-hero.dir*120,14,5,cine.p);},
-  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=tele(cam.position.distanceTo(T));return hero.dir*(heroHead()-cine.s)>hero.len+60||t>25;}},
+  start(){cine.s=findPortal();cine.sb=cine.s-hero.dir*120;cine.mv=[1.6,0,1.3];beside(cine.sb,14,4,cine.p);},
+  upd(t){cam.position.fromArray(moved(t));T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=tele(cam.position.distanceTo(T));return hero.dir*(heroHead()-cine.s)>hero.len+60||t>25;}},
  arrive:{ja:'到着',en:'Arrival',ok:()=>{const ne=hero.ev[hs0.i+1];return hs0.stop<0&&!!ne&&(ne.arr-simT)/Math.max(speed,1)<15;},
-  start(){const ne=hero.ev[hs0.i+1],k=ne.k,o=stations[k].major?14.4-.8:8.9+.8;cine.k=k;cine.s=ne.s;at(ne.s+hero.dir*(hero.len/2+25),hero.dir*o,cine.p);cine.p[1]+=2.85;},
-  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx,HP0.cy+1.6,HP0.cz);const d=cam.position.distanceTo(T);cam.fov=Math.min(50,Math.max(20,tele(d)*1.4));return(hs0.stop===cine.k&&t>6)||t>25;}},
+  start(){const ne=hero.ev[hs0.i+1],k=ne.k,o=stations[k].major?14.4-.8:8.9+.8;cine.k=k;cine.sb=ne.s+hero.dir*(hero.len/2+25);cine.mv=[1.1,0,.12];cine.s=ne.s;at(ne.s+hero.dir*(hero.len/2+25),hero.dir*o,cine.p);cine.p[1]+=2.85;},
+  upd(t){cam.position.fromArray(moved(t));T.set(HP0.cx,HP0.cy+1.6,HP0.cz);const d=cam.position.distanceTo(T);cam.fov=Math.min(50,Math.max(20,tele(d)*1.4));return(hs0.stop===cine.k&&t>6)||t>25;}},
  station:{ja:'停車',en:'Station',ok:()=>hs0.stop>=0,
-  start(){const k=hs0.stop,m=stations[k].major?11.65:10.9;at(hs0.s+hero.dir*(hero.len/2+12),hero.dir*m,cine.p);cine.p[1]+=2.6;},
-  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx-HP0.fx*30,HP0.cy+2,HP0.cz-HP0.fz*30);cam.fov=50;return(hs0.stop<0&&t>3)||t>16;}},
+  start(){cine.sb=hs0.s+hero.dir*(hero.len/2+12);cine.mv=[-1.3,0,0];const k=hs0.stop,m=stations[k].major?11.65:10.9;at(hs0.s+hero.dir*(hero.len/2+12),hero.dir*m,cine.p);cine.p[1]+=2.6;},
+  upd(t){cam.position.fromArray(moved(t));T.set(HP0.cx-HP0.fx*30,HP0.cy+2,HP0.cz-HP0.fz*30);cam.fov=50;return(hs0.stop<0&&t>3)||t>16;}},
 };
 function nextShot(now){if(SHOTS.arrive.ok()&&cine.last!=='arrive'){cine.shot=cine.last='arrive';cine.side=1;cine.t0=now;SHOTS.arrive.start();clearP=true;$('#shot').textContent=`${SHOTS.arrive.ja} ${SHOTS.arrive.en}`;return;}
  const pool=hs0.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal','catch','leave','catch','leave'];
