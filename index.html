@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ShinkaViz">
 <title>Shinkansen vector look test</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet">
@@ -19,7 +23,7 @@ LAYOUT: canvas fills the screen, slim readouts on top, control strip at the bott
 *{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
 html,body{margin:0;height:100%;background:#000;color:var(--ink);overflow:hidden}
 body{font:14px/1.35 "Chakra Petch","Noto Sans JP",system-ui,sans-serif}
-#c{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100lvh;display:block;touch-action:none;cursor:grab}
+#c{position:absolute;left:0;top:0;width:100vw;height:100vh;height:100lvh;display:block;touch-action:none;cursor:grab}
 #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .lb{position:absolute;left:0;top:0;color:#cfeaff;white-space:nowrap;text-align:center;line-height:1.15;text-shadow:0 0 6px rgba(70,170,255,.9)}.lb b{display:block;font-size:14px;font-weight:600}.lb span{display:block;font-size:11px;opacity:.75}
 #hud{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;flex-wrap:wrap}
