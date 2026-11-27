@@ -157,7 +157,7 @@ def main():
     for n, tid in enumerate(sorted(ids)):
         page = fetch(f'{BASE}/train-timetable/{tid}?date={a.date}'); time.sleep(a.delay)
         if a.dump and n < 6: open(os.path.join(a.dump, f'train-{tid}.html'), 'w').write(page)
-        if n < a.show: print(f'--- train page {tid} ---\n' + '\n'.join(text_lines(page)[:120]) + '\n---', flush=True)
+        if n < a.show: print(f'--- train page {tid} ---\n' + '\n'.join([l for l in text_lines(page) if not re.fullmatch(r'\d{1,2}|[日月火水木金土]|\d{4}年\d{1,2}月', l)][:160]) + '\n---', flush=True)
         t = parse_train(page)
         if t: t['stops'] = [s for s in t['stops'] if s[0] in NETWORK]
         if not t or len(t['stops']) < 2 or any(s[1] is None and s[2] is None for s in t['stops']):
