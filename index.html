@@ -25,7 +25,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--ink);overflow:hidden}
 body{font:14px/1.35 "Chakra Petch","Noto Sans JP",system-ui,sans-serif}
 #c{position:absolute;left:0;top:0;width:100vw;height:100vh;height:100lvh;display:block;touch-action:none;cursor:grab}
 #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
-.lb{position:absolute;left:0;top:0;color:#cfeaff;white-space:nowrap;text-align:center;line-height:1.15;text-shadow:0 0 6px rgba(70,170,255,.9)}.lb b{display:block;font-size:14px;font-weight:600}.lb span{display:block;font-size:11px;opacity:.75}
+.lb{position:absolute;left:0;top:0;color:#cfeaff;white-space:nowrap;text-align:center;line-height:1.15;text-shadow:0 0 6px rgba(70,170,255,.9)}.lb b{display:block;font-size:14px;font-weight:600}.lb.hub b{font-size:16px}.lb.tok b{font-size:24px;color:#fff;text-shadow:0 0 10px rgba(255,230,170,.95),0 0 22px rgba(255,200,120,.6)}.lb.tok span{font-size:13px;opacity:.95}.lb span{display:block;font-size:11px;opacity:.75}
 #hud{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;flex-wrap:wrap}
 .card{background:rgba(0,8,16,.55);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
 #clock{font-size:26px;font-weight:600;line-height:1;color:#eaf6ff;text-shadow:0 0 10px rgba(92,200,255,.7);font-variant-numeric:tabular-nums}
@@ -117,6 +117,7 @@ const LCC=(()=>{const R=6371008.8,d=Math.PI/180,p1=33*d,p2=41*d,f0=37*d,l0=137*d
   inv:(x,z)=>{const y=-z,r=Math.sign(n)*Math.hypot(x,r0-y),th=Math.atan2(x,r0-y);return[(l0+th/n)/d,(2*Math.atan(Math.pow(R*F/r,1/n))-Math.PI/2)/d];}};})();
 const llToXZ=(lon,lat)=>LCC.fwd(lon,lat),xzToLL=(X,Z)=>LCC.inv(X,Z);
 const MAJOR=new Set(['東京','品川','新横浜','名古屋','京都','新大阪','新神戸','岡山','広島','小倉','博多','熊本','鹿児島中央','長崎','大宮','仙台','福島','盛岡','新青森','新函館北斗','高崎','新潟','長野','金沢','福井','敦賀','山形','秋田']);
+const HUB=new Set(['新大阪','名古屋','博多','鹿児島中央','長崎','仙台','盛岡','新青森','新函館北斗','新潟','金沢','敦賀','秋田','新庄','広島','大宮']);
 /* Sanyo stations, for the fallback when no line data is present */
 const STN=[["Shin-Osaka",34.7334,135.5002,1,"新大阪"],["Shin-Kobe",34.7066,135.1955,1,"新神戸"],["Nishi-Akashi",34.6652,134.9603,0,"西明石"],["Himeji",34.8270,134.6906,1,"姫路"],["Aioi",34.8064,134.4685,0,"相生"],["Okayama",34.6665,133.9180,1,"岡山"],["Shin-Kurashiki",34.5833,133.6866,0,"新倉敷"],["Fukuyama",34.4893,133.3624,1,"福山"],["Shin-Onomichi",34.4371,133.1884,0,"新尾道"],["Mihara",34.4001,133.0791,0,"三原"],["Higashi-Hiroshima",34.3917,132.7594,0,"東広島"],["Hiroshima",34.3976,132.4752,1,"広島"],["Shin-Iwakuni",34.1653,132.1417,0,"新岩国"],["Tokuyama",34.0518,131.8053,0,"徳山"],["Shin-Yamaguchi",34.0929,131.3960,1,"新山口"],["Asa",34.0512,131.1738,0,"厚狭"],["Shin-Shimonoseki",34.0082,130.9496,0,"新下関"],["Kokura",33.8868,130.8826,1,"小倉"],["Hakata",33.5897,130.4207,1,"博多"]];
 const loadScript=src=>new Promise(res=>{const e=document.createElement('script');e.src=src;e.onload=e.onerror=()=>res();document.head.appendChild(e);});
@@ -265,7 +266,8 @@ for(let k=0;k<NS;k++){for(const dr of[1,-1]){const o1=8.9,o2=stations[k].major?1
   for(const o of[o1,o2])for(const h of[1.25,5.2]){const c=h>2?mul(PLAT,.35):PLAT;let p=atK(k,a0,dr*o,[0,0,0]);p[1]+=h;for(let s=a0+15;s<=a1+1e-6;s+=15){const q=atK(k,s,dr*o,[0,0,0]);q[1]+=h;sS.add(p,q,c);p=q;}}
   for(const s of[a0,a1]){const p=atK(k,s,dr*o1,[0,0,0]),q=atK(k,s,dr*o2,[0,0,0]);p[1]+=1.25;q[1]+=1.25;sS.add(p,q,PLAT);}
   const om=(o1+o2)/2,CAN=mul(PLAT,.3);for(let s=a0+10;s<=a1;s+=20){const b=atK(k,s,dr*om,[0,0,0]);sS.add([b[0],b[1]+1.25,b[2]],[b[0],b[1]+5.2,b[2]],CAN);const l=atK(k,s,dr*o1,[0,0,0]),r=atK(k,s,dr*o2,[0,0,0]);l[1]+=5.2;r[1]+=5.2;sS.add(l,r,CAN);}}
- const b=atK(k,PC[k],0,[0,0,0]);sS.add2(b,[b[0],b[1]+120,b[2]],[1.1,1.3,1.8],[0,.02,.05]);}
+ const b=atK(k,PC[k],0,[0,0,0]);sS.add2(b,[b[0],b[1]+120,b[2]],[1.1,1.3,1.8],[0,.02,.05]);
+ if(stations[k].ja==='東京')sS.add2(b,[b[0],b[1]+14000,b[2]],[3,2.6,1.6],[0,0,0]);else if(HUB.has(stations[k].ja))sS.add2(b,[b[0],b[1]+5000,b[2]],[1.1,1.4,2],[0,0,0]);}
 const WIRE=[.05,.2,.32],POLE=[.035,.13,.22];
 for(const dr of[1,-1]){let p=sp(0,dr*2.15);p[1]+=5;for(let i=1;i<=N;i++){const q=sp(i,dr*2.15);q[1]+=5;if(!BRK[i])sW.add(p,q,TUN[i]?mul(WIRE,.3):WIRE);p=q;}}
 for(let i=0;i<=N;i++){if(TUN[i])continue;const s=i*DS;if(Math.abs(s-PC[nearestK(s)])<640)continue;for(const dr of[1,-1]){const b=sp(i,dr*5.3);sW.add(b,[b[0],b[1]+7.2,b[2]],POLE);const e=sp(i,dr*1.2);e[1]+=6.6;sW.add([b[0],b[1]+6.6,b[2]],e,POLE);}}
@@ -774,7 +776,7 @@ const lerp=(a,b,t)=>a+(b-a)*t,lerpA=(a,b,t)=>{const d=((b-a+Math.PI)%(2*Math.PI)
 const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 const wf=d=>1-ss(2000,20000,d); /* close in, yaw follows the train's heading; far out, it is fixed to the map */
 const HALFX=Math.max(300000,(maxX-minX)*.55),HALFZ=Math.max(150000,(maxZ-minZ)*.55),overDist=()=>Math.min(ORB.max,Math.max(320000,Math.max(HALFX,HALFZ*cam.aspect)/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
-const PRESET={chase:()=>({yaw:Math.atan2(FP0.fz,FP0.fx)+.55,pitch:.12,dist:40}),over:()=>({yaw:ORB.yaw,pitch:1.05,dist:overDist()})};
+const PRESET={chase:()=>({yaw:Math.atan2(FP0.fz,FP0.fx)+.55,pitch:.12,dist:40}),over:()=>({yaw:Math.PI/2,pitch:1.05,dist:overDist()})};
 function flyTo(b,dur){anim={a:{yaw:ORB.yaw,pitch:ORB.pitch,dist:ORB.dist},b,t0:performance.now(),dur};}
 function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===null?hd:wrapA(hd-lastHd)*wf(ORB.dist);lastHd=hd;
  if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=easeIO(t),A=anim.a,B=anim.b;
@@ -927,12 +929,20 @@ function updTrainSel(){const act=trains.filter(tr=>tr===FT||stateAt(tr,simT,FSX)
  sel.value=String(trains.indexOf(FT));}
 $('#trainSel').addEventListener('change',e=>setFocus(trains[+e.target.value]));
 /* ---------- labels + HUD ---------- */
-const lblBox=$('#labels'),LB=stations.map(s=>{const d=document.createElement('div'),b=document.createElement('b'),e=document.createElement('span');d.className='lb';b.textContent=s.ja;e.textContent=s.name;d.append(b,e);lblBox.appendChild(d);return d;});
+/* label priority: Tokyo, then the line termini and big hubs, then the other major stations, then the rest. Zoomed out, lower tiers drop away and
+   labels that would overlap a higher-priority one are hidden. */
+const TIER=stations.map(s=>s.ja==='東京'?0:HUB.has(s.ja)?1:s.major?2:3),ORDER=stations.map((s,k)=>k).sort((a,b)=>TIER[a]-TIER[b]);
+const lblBox=$('#labels'),LB=stations.map((s,k)=>{const d=document.createElement('div'),b=document.createElement('b'),e=document.createElement('span');d.className='lb'+(TIER[k]===0?' tok':TIER[k]===1?' hub':'');b.textContent=s.ja;e.textContent=s.name;d.append(b,e);lblBox.appendChild(d);return d;});
 const nm=k=>`${stations[k].ja} ${stations[k].name}`;
 const v3=new THREE.Vector3();
-function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;k<NS;k++){const o=trk(PC[k]);v3.set(o.x,o.y+(ovf>.3?0:40),o.z);const dist=v3.distanceTo(cam.position);
- let show=ovf>.3?(stations[k].major||ORB.dist<350000):dist<20000;v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1.1||Math.abs(v3.y)>1.1)show=false;const el=LB[k];
- if(!show){el.style.display='none';continue;}el.style.display='';el.style.transform=`translate(${((v3.x*.5+.5)*W).toFixed(1)}px,${((-v3.y*.5+.5)*H).toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=ovf>.3?1:Math.max(0,1-dist/20000).toFixed(2);}}
+const placed=[];
+function updLabels(){const W=window.innerWidth,H=window.innerHeight,far=ovf>.3,D=ORB.dist;placed.length=0;
+ for(const k of ORDER){const o=trk(PC[k]);v3.set(o.x,o.y+(far?0:40),o.z);const dist=v3.distanceTo(cam.position),t=TIER[k];
+  let show=far?(t<=1||(t===2&&D<900000)||D<350000):dist<20000;v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1.1||Math.abs(v3.y)>1.1)show=false;
+  const x=(v3.x*.5+.5)*W,y=(-v3.y*.5+.5)*H,el=LB[k],hw=t===0?70:46,hh=t===0?34:26;
+  if(show&&far&&placed.some(p=>Math.abs(p[0]-x)<p[2]+hw&&Math.abs(p[1]-y)<p[3]+hh))show=false;
+  if(!show){el.style.display='none';continue;}placed.push([x,y,hw,hh]);
+  el.style.display='';el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=far?1:Math.max(0,1-dist/20000).toFixed(2);}}
 const pad=n=>String(n).padStart(2,'0'),fmt=t=>{t=((t%86400)+86400)%86400;return `${pad(t/3600|0)}:${pad((t/60|0)%60)}:${pad(t%60|0)}`;},hm=t=>fmt(t).slice(0,5);
 const E={clock:$('#clock'),cnt:$('#cnt'),spd:$('#spd'),stat:$('#stat'),next:$('#next'),km:$('#km')};let hudT=0,active=0;
 function updHud(){const h=fs,ev=FT.ev,n=tName(FT),md=tStock(FT);$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`+(LIVE?` · tiles ${LTM.ready}/${LTM.want}`:'');E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
