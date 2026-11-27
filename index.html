@@ -678,7 +678,7 @@ function fitRun(d,T){const D=T*T-4*RA*d;if(!(T>0)||D<=0)return segRun(d,VMAX);co
 const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama','名古屋':'Nagoya','京都':'Kyoto','熊本':'Kumamoto','鹿児島中央':'Kagoshima-Chuo','新鳥栖':'Shin-Tosu','久留米':'Kurume','筑後船小屋':'Chikugo-Funagoya','新大牟田':'Shin-Omuta','新玉名':'Shin-Tamana','新八代':'Shin-Yatsushiro','博多南':'Hakata-Minami'};
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
-  const type=SV[t.type]?t.type:'kodama',sv=SV[type],cars=Math.max(4,Math.min(16,t.cars||sv.cars)),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
+  const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
    liv:cars>=16?'noz':'kyu',ev:[]};
