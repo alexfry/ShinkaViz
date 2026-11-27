@@ -10,34 +10,66 @@ Output:
 Data (c) OpenStreetMap contributors, ODbL. Show that credit wherever it is displayed.
 Usage: python3 osm_sanyo.py [out.json]       (standard library only)
 """
-import json, math, sys, urllib.parse, urllib.request
+import json, math, sys, time, urllib.error, urllib.parse, urllib.request
 
-OVERPASS = "https://overpass-api.de/api/interpreter"
+MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
 STATIONS = ["新大阪", "新神戸", "西明石", "姫路", "相生", "岡山", "新倉敷", "福山", "新尾道", "三原",
             "東広島", "広島", "新岩国", "徳山", "新山口", "厚狭", "新下関", "小倉", "博多"]
 BBOX = "33.4,130.2,35.0,135.7"
 STEP = 50.0  # metres between centreline samples
 
-QUERY = f"""
-[out:json][timeout:300];
-(
-  relation["route"="railway"]["name"="山陽新幹線"];
-)->.rel;
+# Two smaller queries instead of one big one: public Overpass servers often
+# answer large or long-running requests with 502/504.
+Q_TRACKS = f"""
+[out:json][timeout:180];
+relation["route"="railway"]["name"="山陽新幹線"]->.rel;
 (
   way(r.rel)["railway"="rail"];
   way["railway"="rail"]["name"="山陽新幹線"]({BBOX});
-)->.tracks;
-.tracks out tags geom;
+);
+out tags geom;
+"""
+Q_STATIONS = f"""
+[out:json][timeout:120];
 nwr["railway"="station"]["name"~"^({'|'.join(STATIONS)})$"]({BBOX});
 out tags center;
 """
 
 
+def overpass(query, label):
+    """POST a query, trying each mirror with backoff. Busy servers return 429/502/503/504."""
+    body = urllib.parse.urlencode({"data": query}).encode()
+    last = None
+    for attempt in range(3):
+        for url in MIRRORS:
+            host = urllib.parse.urlparse(url).netloc
+            try:
+                print(f"{label}: {host} (attempt {attempt + 1})", file=sys.stderr)
+                req = urllib.request.Request(url, data=body, headers={"User-Agent": "ShinkaViz/0.1 (github.com/alexfry/shinkaviz)"})
+                with urllib.request.urlopen(req, timeout=240) as r:
+                    data = json.load(r)
+                if data.get("remark", "").startswith("runtime error"):
+                    raise RuntimeError(data["remark"])
+                return data
+            except urllib.error.HTTPError as e:
+                detail = e.read(300).decode("utf-8", "replace").strip().replace("\n", " ")
+                last = f"{host}: HTTP {e.code} {detail[:200]}"
+            except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
+                last = f"{host}: {e}"
+            print(f"  failed: {last}", file=sys.stderr)
+        time.sleep(15 * (attempt + 1))
+    sys.exit(f"All Overpass mirrors failed. Last error: {last}")
+
+
 def fetch():
-    body = urllib.parse.urlencode({"data": QUERY}).encode()
-    req = urllib.request.Request(OVERPASS, data=body, headers={"User-Agent": "shinkansen-visualiser/0.1"})
-    with urllib.request.urlopen(req, timeout=400) as r:
-        return json.load(r)
+    tracks = overpass(Q_TRACKS, "tracks")
+    stations = overpass(Q_STATIONS, "stations")
+    return {"elements": tracks["elements"] + stations["elements"]}
 
 
 # Local equirectangular projection, metres. Same origin as the page.
