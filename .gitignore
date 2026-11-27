@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 osm-context.json
 .cache/
+tools/three.min.js
+tools/o_*.png
+tools/ortho.html
