@@ -119,24 +119,26 @@ def build(L):
         for i, (a, b) in enumerate(zip(guide, guide[1:])):
             dx, dz = b[0] - a[0], b[1] - a[1]; L2 = dx * dx + dz * dz or 1.0
             t0 = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / L2; t = max(0.0, min(1.0, t0))
+            ext = 0.0
+            if t0 < 0 and i == 0: t, ext = t0, t0                                  # before the first station
+            elif t0 > 1 and i == len(guide) - 2: t, ext = t0, t0 - 1               # past the last
             q = (a[0] + t * dx, a[1] + t * dz); d = math.dist(p, q)
-            over = (t0 < 0 and i == 0) or (t0 > 1 and i == len(guide) - 2)
-            if d < best[0]: best = (d, seg0[i] + t * math.sqrt(L2), over)
+            if d < best[0]: best = (d, seg0[i] + t * math.sqrt(L2), abs(ext) * math.sqrt(L2))
         return best
-    # order rail points along the guide (dropping track beyond the end stations and far-off branches), 50 m bins
-    lim = 6000 if L.get('mini') else 12000
+    # order rail points along the guide, 50 m bins. Track continues up to EXT past the end stations (so lines that meet
+    # at a junction overlap a little and trains can stand in the platforms); far-off branches are dropped.
+    lim, EXT = (6000 if L.get('mini') else 12000), 1500
     bins = {}
     for n, p in enumerate(pts[::2]):
         d, s, over = chain(p)
-        if over or d > lim: continue
+        if d > lim or over > EXT or (over and d > 300): continue
         b = bins.setdefault(int(s // STEP), [0.0, 0.0, 0]); b[0] += p[0]; b[1] += p[1]; b[2] += 1
     keys = sorted(bins)
     if len(keys) < 20: raise RuntimeError('too little track near the stations')
     gaps = [(a, b) for a, b in zip(keys, keys[1:]) if b - a > 10]
     for a, b in gaps[:8]: log(f'    gap {a * STEP / 1000:.1f}-{b * STEP / 1000:.1f} km')
     line = [(bins[k][0] / bins[k][2], bins[k][1] / bins[k][2]) for k in keys]
-    line = [guide[0]] + smooth(line, 3) + [guide[-1]]
-    line = resample(line, 25)
+    line = resample(smooth(line, 3), 25)
     for radius, sigma, w in [(120, 50, 3), (60, 20, 3), (20, 8, 2), (8, 4, 2), (8, 4, 2)]:
         moved = []
         for p in line:
