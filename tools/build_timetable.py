@@ -139,6 +139,7 @@ def main():
     ap.add_argument('--dump', default=None)
     ap.add_argument('--min', type=int, default=150, help='refuse to write fewer trains than this')
     ap.add_argument('--delay', type=float, default=0.7)
+    ap.add_argument('--show', type=int, default=0, help='print the text of the first N train pages (for checking the parser)')
     a = ap.parse_args()
     if a.dump: os.makedirs(a.dump, exist_ok=True)
     ids = {}
@@ -153,6 +154,7 @@ def main():
     for n, tid in enumerate(sorted(ids)):
         page = fetch(f'{BASE}/train-timetable/{tid}?date={a.date}'); time.sleep(a.delay)
         if a.dump and n < 6: open(os.path.join(a.dump, f'train-{tid}.html'), 'w').write(page)
+        if n < a.show: print(f'--- train page {tid} ---\n' + '\n'.join(text_lines(page)[:120]) + '\n---', flush=True)
         t = parse_train(page)
         if t: t['stops'] = [s for s in t['stops'] if s[0] in SANYO]
         if not t or len(t['stops']) < 2 or any(s[1] is None and s[2] is None for s in t['stops']):

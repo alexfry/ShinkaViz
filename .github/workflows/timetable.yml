@@ -33,7 +33,7 @@ jobs:
         run: |
           ARGS=""
           if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
-          python3 tools/build_timetable.py $ARGS --dump tools/.cache/pages
+          python3 tools/build_timetable.py $ARGS --dump tools/.cache/pages --show 3
 
       - name: Keep a sample of the raw pages (for checking the parser)
         if: always()
