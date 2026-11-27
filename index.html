@@ -38,6 +38,12 @@ body{font:14px/1.35 "Chakra Petch","Noto Sans JP",system-ui,sans-serif}
 .seg button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 label.sl{display:flex;align-items:center;gap:8px;color:var(--dim);background:rgba(0,10,20,.65);border:1px solid var(--line);border-radius:6px;padding:0 10px;min-height:42px}
 input[type=range]{width:110px;accent-color:var(--acc)}
+.pop{position:relative}.pop summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:42px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65)}
+.pop summary::-webkit-details-marker{display:none}.pop[open] summary{background:rgba(92,200,255,.24);color:#fff}
+.pop summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#layerList{position:absolute;bottom:50px;left:0;z-index:2;display:grid;gap:2px;padding:8px 10px;min-width:220px;background:rgba(0,8,16,.92);border:1px solid var(--line);border-radius:6px}
+#layerList label{display:flex;align-items:center;gap:10px;min-height:36px;cursor:pointer;white-space:nowrap}
+#layerList input{width:18px;height:18px;flex:none;accent-color:var(--acc)}#layerList .sl2{justify-content:space-between}#layerList .sl2 input{width:110px;height:auto}#layerList hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}#shot{font-size:12px;color:var(--acc);margin-top:2px}#shot:empty{display:none}#layerList i{width:16px;height:3px;border-radius:2px;flex:none}
 #note{flex-basis:100%;margin:0;font-size:12px;color:var(--dim);text-shadow:0 0 4px #000}#note a{color:var(--ink)}
 #msg{position:fixed;inset:0;display:grid;place-items:center;color:var(--dim);font-size:15px;pointer-events:none;padding:20px;text-align:center}
 @media(max-width:600px){#clock{font-size:20px}#hero{font-size:12px}#hero h1{font-size:13px}input[type=range]{width:72px}.seg button{padding:0 9px}label.sl{padding:0 8px;font-size:13px}}
@@ -47,7 +53,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 <canvas id="c" aria-label="Vector-style 3D view of the Sanyo Shinkansen with a 500 series train"></canvas>
 <div id="labels"></div>
 <div id="hud">
-  <div class="card"><div id="clock">--:--:--</div><div class="k" id="cnt"></div>
+  <div class="card"><div id="clock">--:--:--</div><div class="k" id="cnt"></div><div id="shot"></div>
     <div id="legend"><span><i style="background:#ffb347"></i>のぞみ Nozomi</span><span><i style="background:#ff5ce0"></i>さくら Sakura</span><span><i style="background:#5cff9a"></i>こだま Kodama</span><span><i style="background:#cfe6ff"></i>500系 500 series</span></div></div>
   <div class="card" id="hero"><h1>こだま · 500系 <span class="k" style="font-weight:400">Kodama · 500 series</span></h1><div class="g">
     <span class="k">速度 Speed</span><span class="v" id="spd"></span>
@@ -56,15 +62,15 @@ input[type=range]{width:110px;accent-color:var(--acc)}
     <span class="k">位置 Position</span><span class="v" id="km"></span></div></div>
 </div>
 <div id="ui">
-  <div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="side">Trackside</button><button data-m="over">Overview</button></div>
+  <div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button></div>
   <div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div>
-  <label class="sl">Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label>
-  <label class="sl">Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label>
-  <p id="note"><span id="src"></span> Terrain is procedural and the timetable is an invented sample. 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom. <span id="credit" hidden>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</span></p>
+  <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><hr></div></details>
+      <p id="note"><span id="src"></span> Terrain is procedural and the timetable is an invented sample. 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom. <span id="credit" hidden>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</span></p>
 </div>
 <div id="msg">Building scene…</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="data/sanyo-line.js"></script>
+<script src="data/sanyo-context.js"></script>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -90,6 +96,7 @@ const stations=STN.map(([name,lat,lon,major,ja])=>({name,ja,major:!!major,x:(lon
 const NS=stations.length;
 /* Track: OpenStreetMap centreline from data/sanyo-line.js (build_line.py); falls back to a curve through the stations. */
 const LINE=window.SANYO_LINE&&window.SANYO_LINE.origin[0]===LAT0&&window.SANYO_LINE.origin[1]===LON0&&STN.every(r=>window.SANYO_LINE.stations.some(x=>x.ja===r[4]))?window.SANYO_LINE:null;
+const CTX=window.SANYO_CONTEXT&&window.SANYO_CONTEXT.origin[0]===LAT0&&window.SANYO_CONTEXT.origin[1]===LON0?window.SANYO_CONTEXT:null;
 let N,DS,LEN,SRC_X,SRC_Z;
 if(LINE){N=LINE.xz.length/2-1;DS=LINE.step;LEN=N*DS;SRC_X=i=>LINE.xz[2*i];SRC_Z=i=>LINE.xz[2*i+1];}
 else{const curve=new THREE.CatmullRomCurve3(stations.map(s=>new THREE.Vector3(s.x,0,s.z)),false,'centripetal');curve.arcLengthDivisions=40000;LEN=curve.getLength();N=Math.round(LEN/50);DS=LEN/N;const raw=curve.getSpacedPoints(N);SRC_X=i=>raw[i].x;SRC_Z=i=>raw[i].z;}
@@ -158,7 +165,7 @@ const CX=(minX+maxX)/2,CZ=(minZ+maxZ)/2;
 {const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/G)+1,nz=Math.ceil((maxZ+50000-z0)/G)+1,h=new Float32Array(nx*nz);
  for(let i=0;i<nx;i++){const x=x0+i*G,zt=zAt(x);for(let j=0;j<nz;j++)h[j*nx+i]=Hx(x,z0+j*G,zt);}
  const MS=[[],[3,0],[0,1],[3,1],[1,2],[3,0,1,2],[0,2],[3,2],[2,3],[0,2],[0,1,2,3],[1,2],[1,3],[0,1],[0,3],[]];
- for(let L=0;L<=1000;L+=100){const col=L===0?[.08,.34,.44]:mul([.045,.13,.17],.6+L/1000);
+ for(let L=CTX&&CTX.layers.coast&&CTX.layers.coast.length?100:0;L<=1000;L+=100){const col=L===0?[.08,.34,.44]:mul([.045,.13,.17],.6+L/1000);
   for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=h[j*nx+i],b=h[j*nx+i+1],c=h[(j+1)*nx+i+1],d=h[(j+1)*nx+i];
    const k=(a>L?1:0)|(b>L?2:0)|(c>L?4:0)|(d>L?8:0);if(k===0||k===15)continue;const X=x0+i*G,Z=z0+j*G;
    const e=n=>n===0?[X+(L-a)/(b-a)*G,L,Z]:n===1?[X+G,L,Z+(L-b)/(c-b)*G]:n===2?[X+(L-d)/(c-d)*G,L,Z+G]:[X,L,Z+(L-a)/(d-a)*G];
@@ -171,8 +178,15 @@ for(let i=0;i<=N;i++){if(!BRG[i]||TUN[i])continue;const g=Math.max(hs[i],0),top=
 for(let i=1;i<=N;i++){if(TUN[i]===TUN[i-1])continue;const j=TUN[i]?i:i-1;let p=null;
  for(let k=0;k<=24;k++){const t=k/24;let u,v;if(t<.2){u=-4.8;v=t/.2*3.5;}else if(t>.8){u=4.8;v=(1-t)/.2*3.5;}else{const an=Math.PI*(1-(t-.2)/.6);u=4.8*Math.cos(an);v=3.5+4.8*Math.sin(an);}
   const q=sp(j,u);q[1]+=v-.5;if(p)sS.add(p,q,mul(PORT,1.2));p=q;}}
-scene.add(sC.mesh(contourMat),sT.mesh(trackMat),sW.mesh(wireMat),sS.mesh(stationMat));
-const SRC_NOTE=LINE?'Track alignment, tunnels and viaducts from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
+const contourObj=sC.mesh(contourMat);scene.add(contourObj,sT.mesh(trackMat),sW.mesh(wireMat),sS.mesh(stationMat));
+/* OpenStreetMap context layers (data/sanyo-context.js, from build_context.py) */
+const CTXL={coast:{c:[.12,.5,.75],k:1.3,ja:'海岸線',en:'Coastline'},river:{c:[.1,.35,.8],k:1.0,ja:'河川',en:'Rivers'},motorway:{c:[1,.45,.1],k:.75,ja:'高速道路',en:'Motorways'},
+ trunk:{c:[.8,.4,.12],k:.4,ja:'国道',en:'Trunk roads'},jr:{c:[.7,.3,1],k:1.0,ja:'JR在来線',en:'JR lines'},rail:{c:[.5,.35,.7],k:.5,ja:'その他の鉄道',en:'Other railways'}};
+const layerObjs={};
+if(CTX)for(const [k,L] of Object.entries(CTXL)){const lines=CTX.layers[k];if(!lines||!lines.length)continue;const S=new Seg(),col=mul(L.c,L.k),lift=k==='jr'||k==='rail'?1.5:.8;
+ for(const a of lines){let p=null;for(let i=0;i<a.length;i+=2){const x=a[i],z=a[i+1],q=[x,k==='coast'?.3:Math.max(Hx(x,z,zAt(x)),0)+lift,z];if(p)S.add(p,q,col);p=q;}}
+ const mat=lineMat(),o=S.mesh(mat);scene.add(o);layerObjs[k]={o,mat};}
+const SRC_NOTE=LINE?'Track alignment, tunnels and viaducts'+(CTX?', plus coastline, rivers, roads and other railways,':'')+' from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
 
 /* near terrain grid around the camera target */
 const NPn=61,NPs=100,NPh=(NPn-1)/2*NPs,npSegs=2*NPn*(NPn-1),npPos=new Float32Array(npSegs*6),npCol=new Float32Array(npSegs*6),npH=new Float32Array(NPn*NPn);
@@ -323,30 +337,78 @@ function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSiz
  cam.aspect=w/h;clearP=true;}
 function pass(m,rt){quad.material=m;renderer.setRenderTarget(rt);renderer.render(qScene,qCam);}
 
-/* ---------- camera ---------- */
-let mode='chase',speed=1;const ORB={chase:{yaw:.55,pitch:.12,dist:40,min:12,max:3000},over:{yaw:Math.PI/2,pitch:1.05,dist:800000,min:15000,max:2500000}},side={s:null,p:[0,0,0]};
+/* ---------- camera: one continuous orbit (chase <-> overview) and a cinematic director ---------- */
+let mode='orbit',speed=1,anim=null,ovf=0;
+const ORB={yaw:.55,pitch:.12,dist:40,min:12,max:2500000};
 const T=new THREE.Vector3(),hs0={s:0,v:0,stop:-1,i:0};
 const ss=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
-function updCam(){const P=HP0;
- if(mode==='chase'){const o=ORB.chase;T.set(P.cx+P.ux*1.6,P.cy+P.uy*1.6,P.cz+P.uz*1.6);const a=o.yaw+Math.atan2(P.fz,P.fx),cp=Math.cos(o.pitch);
-  cam.position.set(T.x+Math.cos(a)*cp*o.dist,T.y+Math.sin(o.pitch)*o.dist,T.z+Math.sin(a)*cp*o.dist);cam.fov=50;cam.near=Math.max(.3,o.dist*.1);cam.far=130000;U.uFadeNear.value=25000;U.uFadeFar.value=115000;}
- else if(mode==='side'){const head=hs0.s+hero.dir*hero.len/2;
-  if(side.s===null||hero.dir*(head-side.s)>150||Math.abs(head-side.s)>5000){let s=head+hero.dir*1500;for(let k=0;k<12&&TUN[trk(s).i];k++)s+=hero.dir*400;side.s=Math.min(Math.max(s,50),LEN-50);at(side.s,hero.dir*30,side.p);side.p[1]+=2.5;clearP=true;}
-  cam.position.set(side.p[0],side.p[1],side.p[2]);T.set(P.cx,P.cy+1.8,P.cz);const d=cam.position.distanceTo(T);cam.fov=Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));cam.near=Math.max(1,d*.3);cam.far=160000;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
- else{const o=ORB.over,k=ss(260000,50000,o.dist);T.set(CX+(P.cx-CX)*k,P.cy*k,CZ+(P.cz-CZ)*k);const cp=Math.cos(o.pitch);
-  cam.position.set(T.x+Math.cos(o.yaw)*cp*o.dist,T.y+Math.sin(o.pitch)*o.dist,T.z+Math.sin(o.yaw)*cp*o.dist);cam.fov=50;cam.near=Math.max(5,o.dist*.002);cam.far=o.dist*5+300000;U.uFadeNear.value=1e9;U.uFadeFar.value=2e9;}
- cam.lookAt(T);cam.updateProjectionMatrix();}
+const lerp=(a,b,t)=>a+(b-a)*t,lerpA=(a,b,t)=>{const d=((b-a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;return a+d*t;};
+const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const wf=d=>1-ss(2000,20000,d); /* close in, yaw follows the train's heading; far out, it is fixed to the map */
+const overDist=()=>Math.min(ORB.max,Math.max(320000,300000/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
+const PRESET={chase:()=>({yaw:.55,pitch:.12,dist:40}),over:()=>({yaw:Math.PI/2,pitch:1.05,dist:overDist()})};
+function flyTo(b,dur){anim={a:{yaw:ORB.yaw,pitch:ORB.pitch,dist:ORB.dist},b,t0:performance.now(),dur};}
+function orbitCam(now){const P=HP0,hd=Math.atan2(P.fz,P.fx);
+ if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=easeIO(t),A=anim.a,B=anim.b;
+  ORB.dist=Math.exp(lerp(Math.log(A.dist),Math.log(B.dist),e));ORB.pitch=lerp(A.pitch,B.pitch,e);
+  ORB.yaw=lerpA(A.yaw+hd*wf(A.dist),B.yaw+hd*wf(B.dist),e)-hd*wf(ORB.dist);if(t>=1)anim=null;}
+ const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw+hd*wf(d),cp=Math.cos(ORB.pitch);
+ T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));
+ cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(ORB.pitch)*d,T.z+Math.sin(a)*cp*d);
+ cam.fov=50;cam.near=Math.max(.3,d*.05);cam.far=d*5+130000;ovf=ss(20000,300000,d);
+ U.uFadeNear.value=Math.max(25000,d*3);U.uFadeFar.value=Math.max(115000,d*6);}
+
+/* cinematic: automatic shots with hard cuts */
+const cine={shot:null,t0:0,last:null,side:1,s:0,p:[0,0,0],yaw:0,u:0};
+const Q=[0,0,0],Q2=[0,0,0];
+const heroHead=()=>hs0.s+hero.dir*hero.len/2;
+function beside(s,extra,dy,out){const l=latFor(hero,s);at(s,l+hero.dir*extra*cine.side,out);out[1]+=dy;return out;}
+function onTrain(s,dy,out){at(s,latFor(hero,s),out);out[1]+=dy;return out;}
+function findPortal(){const i0=Math.round(heroHead()/DS);for(let j=12;j<=40;j++){const i=i0+hero.dir*j,b=i-hero.dir;if(i<1||i>=N)break;if(TUN[i]&&!TUN[b])return i*DS;}return null;}
+const tele=d=>Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));
+const SHOTS={
+ flyby:{ja:'通過',en:'Flyby',ok:()=>hs0.stop<0,
+  start(){let s=heroHead()+hero.dir*(900+Math.random()*900);for(let k=0;k<12&&TUN[trk(s).i];k++)s+=hero.dir*400;cine.s=Math.min(Math.max(s,50),LEN-50);beside(cine.s,25+Math.random()*20,2+Math.random()*6,cine.p);},
+  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=tele(cam.position.distanceTo(T));return hero.dir*(heroHead()-cine.s)>250||t>20;}},
+ track:{ja:'並走',en:'Tracking',ok:()=>hs0.stop<0,start(){cine.u=Math.random()<.5?0:1;},
+  upd(t){const f=Math.min(1,t/10),u=cine.u?1-f:f,s=heroHead()-hero.dir*hero.len*(.95-.85*u);cam.position.fromArray(beside(s,13,2.2,Q));T.fromArray(onTrain(s+hero.dir*35,1.8,Q2));cam.fov=40;return t>10;}},
+ heli:{ja:'空撮',en:'Aerial',ok:()=>true,start(){},
+  upd(t){onTrain(hs0.s,0,Q);const a=cine.yaw+t*.07;cam.position.set(Q[0]+Math.cos(a)*380,Q[1]+170,Q[2]+Math.sin(a)*380);T.fromArray(Q);cam.fov=32;return t>13;}},
+ nose:{ja:'先頭',en:'Nose',ok:()=>hs0.stop<0,start(){},
+  upd(t){cam.position.fromArray(beside(heroHead()+hero.dir*30,5+2*Math.sin(t*.5),1.2,Q));T.set(HP0.cx+HP0.fx*8,HP0.cy+1.5,HP0.cz+HP0.fz*8);cam.fov=42;return t>8;}},
+ top:{ja:'真上',en:'Overhead',ok:()=>true,start(){},
+  upd(t){onTrain(hs0.s,0,Q);cam.position.set(Q[0]-HP0.fx*60,Q[1]+240-t*4,Q[2]-HP0.fz*60);T.fromArray(Q);cam.fov=38;return t>8;}},
+ portal:{ja:'トンネル',en:'Tunnel portal',ok:()=>hs0.stop<0&&findPortal()!==null,
+  start(){cine.s=findPortal();beside(cine.s-hero.dir*120,14,5,cine.p);},
+  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx,HP0.cy+1.8,HP0.cz);cam.fov=tele(cam.position.distanceTo(T));return hero.dir*(heroHead()-cine.s)>hero.len+60||t>25;}},
+ station:{ja:'停車',en:'Station',ok:()=>hs0.stop>=0,
+  start(){const k=hs0.stop,m=stations[k].major?11.65:10.9;at(hs0.s+hero.dir*(hero.len/2+12),hero.dir*m,cine.p);cine.p[1]+=2.6;},
+  upd(t){cam.position.fromArray(cine.p);T.set(HP0.cx-HP0.fx*30,HP0.cy+2,HP0.cz-HP0.fz*30);cam.fov=50;return(hs0.stop<0&&t>3)||t>16;}},
+};
+function nextShot(now){const pool=hs0.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal'];
+ let c=pool.filter(k=>k!==cine.last&&SHOTS[k].ok());if(!c.length)c=['heli'];
+ cine.shot=c.includes('portal')&&Math.random()<.5?'portal':c.includes('station')?'station':c[Math.random()*c.length|0];
+ cine.last=cine.shot;cine.side=Math.random()<.75?1:-1;cine.yaw=Math.random()*6.283;cine.t0=now;SHOTS[cine.shot].start();clearP=true;
+ $('#shot').textContent=`${SHOTS[cine.shot].ja} ${SHOTS[cine.shot].en}`;}
+function cineCam(now){if(!cine.shot)nextShot(now);if(SHOTS[cine.shot].upd((now-cine.t0)/1000)){nextShot(now);SHOTS[cine.shot].upd(0);}
+ cam.near=Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
+function updCam(now){if(mode==='cine')cineCam(now);else orbitCam(now);cam.lookAt(T);cam.updateProjectionMatrix();}
+
 const ptrs=new Map();let pinch=0;
+const clampPitch=p=>Math.min(1.45,Math.max(lerp(-.05,.15,ss(2000,100000,ORB.dist)),p));
 canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch=Math.hypot(a[0]-b[0],a[1]-b[1]);}});
-canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;const o=ORB[mode];if(!o)return;
- if(ptrs.size===1){o.yaw+=dx*.006;o.pitch=Math.min(1.45,Math.max(mode==='chase'?-.05:.15,o.pitch+dy*.005));}
- else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)o.dist=Math.min(o.max,Math.max(o.min,o.dist*pinch/d));pinch=d;}});
+canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;if(mode!=='orbit')return;anim=null;
+ if(ptrs.size===1){ORB.yaw+=dx*.006;ORB.pitch=clampPitch(ORB.pitch+dy*.005);}
+ else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0){ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*pinch/d));ORB.pitch=clampPitch(ORB.pitch);}pinch=d;}});
 const up=e=>{ptrs.delete(e.pointerId);pinch=0;};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-canvas.addEventListener('wheel',e=>{e.preventDefault();const o=ORB[mode];if(o)o.dist=Math.min(o.max,Math.max(o.min,o.dist*Math.exp(e.deltaY*.0012)));},{passive:false});
-function setMode(m){mode=m;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===m);
- if(m==='over')ORB.over.dist=Math.min(ORB.over.max,Math.max(320000,300000/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
- side.s=null;clearP=true;$('#legend').style.display=m==='over'?'flex':'none';const ov=m==='over';trackMat.uniforms.uMul.value=ov?.3:1;wireMat.uniforms.uMul.value=ov?.08:1;patchMat.uniforms.uMul.value=ov?0:1;}
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode!=='orbit')return;anim=null;ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*Math.exp(e.deltaY*.0012)));ORB.pitch=clampPitch(ORB.pitch);},{passive:false});
+function setMode(m){if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
+ else{const b=PRESET[m]();if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m);});
+let modeShown='',legendShown=null;
+function updModeUi(){const cur=mode==='cine'?'cine':ORB.dist<30000?'chase':'over';if(cur!==modeShown){modeShown=cur;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===cur);}
+ const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
+ trackMat.uniforms.uMul.value=1-.7*ovf;wireMat.uniforms.uMul.value=1-.92*ovf;patchMat.uniforms.uMul.value=1-ovf;for(const L of Object.values(layerObjs))L.mat.uniforms.uMul.value=1-.4*ovf;}
 $('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
 const pers=$('#pers'),glow=$('#glow');
 
@@ -354,9 +416,9 @@ const pers=$('#pers'),glow=$('#glow');
 const lblBox=$('#labels'),LB=stations.map(s=>{const d=document.createElement('div'),b=document.createElement('b'),e=document.createElement('span');d.className='lb';b.textContent=s.ja;e.textContent=s.name;d.append(b,e);lblBox.appendChild(d);return d;});
 const nm=k=>`${stations[k].ja} ${stations[k].name}`;
 const v3=new THREE.Vector3();
-function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;k<NS;k++){const o=trk(PC[k]);v3.set(o.x,o.y+(mode==='over'?0:40),o.z);const dist=v3.distanceTo(cam.position);
- let show=mode==='over'?(stations[k].major||ORB.over.dist<350000):dist<20000;v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1.1||Math.abs(v3.y)>1.1)show=false;const el=LB[k];
- if(!show){el.style.display='none';continue;}el.style.display='';el.style.transform=`translate(${((v3.x*.5+.5)*W).toFixed(1)}px,${((-v3.y*.5+.5)*H).toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=mode==='over'?1:Math.max(0,1-dist/20000).toFixed(2);}}
+function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;k<NS;k++){const o=trk(PC[k]);v3.set(o.x,o.y+(ovf>.3?0:40),o.z);const dist=v3.distanceTo(cam.position);
+ let show=ovf>.3?(stations[k].major||ORB.dist<350000):dist<20000;v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1.1||Math.abs(v3.y)>1.1)show=false;const el=LB[k];
+ if(!show){el.style.display='none';continue;}el.style.display='';el.style.transform=`translate(${((v3.x*.5+.5)*W).toFixed(1)}px,${((-v3.y*.5+.5)*H).toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=ovf>.3?1:Math.max(0,1-dist/20000).toFixed(2);}}
 const pad=n=>String(n).padStart(2,'0'),fmt=t=>{t=((t%86400)+86400)%86400;return `${pad(t/3600|0)}:${pad((t/60|0)%60)}:${pad(t%60|0)}`;},hm=t=>fmt(t).slice(0,5);
 const E={clock:$('#clock'),cnt:$('#cnt'),spd:$('#spd'),stat:$('#stat'),next:$('#next'),km:$('#km')};let hudT=0,active=0;
 function updHud(){const h=hs0,ev=hero.ev;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`;E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
@@ -371,7 +433,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  for(const tr of trains){const st=stateAt(tr,simT,so);if(!st)continue;active++;if(tr.hero){hs0.s=st.s;hs0.v=st.v;hs0.stop=st.stop;hs0.i=st.i;placeHero(st,dt);}else drawN700(tr,st);dot(tr,st);}
  dG.setDrawRange(0,nv);dG.attributes.position.needsUpdate=true;dG.attributes.col.needsUpdate=true;io.count=ni;io.instanceMatrix.needsUpdate=true;
  pG.setDrawRange(0,np);for(const k of['position','col','sz','kind'])pG.attributes[k].needsUpdate=true;
- updCam();if(mode!=='over')patch(HP0.cx,HP0.cz);
+ updCam(now);updModeUi();if(ovf<.9)patch(HP0.cx,HP0.cz);
  hullMat.uniforms.uPix.value=1.5*DPR*2*Math.tan(cam.fov*Math.PI/360)/BH;
  renderer.setRenderTarget(rtMain);renderer.clear(true,true,false);cam.layers.enable(0);cam.layers.enable(1);renderer.render(scene,cam);
  renderer.setRenderTarget(rtTrain);renderer.clear(true,true,false);cam.layers.set(1);renderer.render(scene,cam);cam.layers.enable(0);
@@ -383,7 +445,13 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  const fu=mFinal.uniforms;fu.tMain.value=rtMain.texture;fu.tP.value=cur.texture;fu.b1.value=lv[0].a.texture;fu.b2.value=lv[1].a.texture;fu.b3.value=lv[2].a.texture;fu.b4.value=lv[3].a.texture;fu.b5.value=lv[4].a.texture;fu.uGlow.value=+glow.value;pass(mFinal,null);
  updLabels();if(now-hudT>120){hudT=now;updHud();}}
 window.addEventListener('resize',resize);
-$('#src').textContent=SRC_NOTE;$('#credit').hidden=!LINE;resize();setMode('chase');msg.remove();requestAnimationFrame(frame);
+{const box=$('#layerList'),items=[['terrain',{ja:'地形 (仮)',en:'Terrain (placeholder)',c:[.1,.4,.5],k:1}],...Object.entries(CTXL).filter(([k])=>layerObjs[k])];
+ let saved={};try{saved=JSON.parse(localStorage.getItem('shinkaviz-layers')||'{}');}catch(e){}
+ const apply=(k,on)=>{if(k==='terrain'){contourObj.visible=on;npL.visible=on;}else layerObjs[k].o.visible=on;};
+ for(const [k,L] of items){const lab=document.createElement('label'),cb=document.createElement('input'),sw=document.createElement('i'),tx=document.createElement('span');
+  cb.type='checkbox';cb.checked=saved[k]!==false;cb.addEventListener('change',()=>{apply(k,cb.checked);saved[k]=cb.checked;try{localStorage.setItem('shinkaviz-layers',JSON.stringify(saved));}catch(e){}});
+  const c=L.c.map(v=>Math.round(Math.min(1,v*1.4)*255));sw.style.background=`rgb(${c})`;tx.textContent=`${L.ja} ${L.en}`;lab.append(cb,sw,tx);box.appendChild(lab);apply(k,cb.checked);}}
+$('#src').textContent=SRC_NOTE;$('#credit').hidden=!LINE;resize();msg.remove();requestAnimationFrame(frame);
 }
 }
 </script>

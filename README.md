@@ -20,7 +20,11 @@ What is placeholder:
 - **500 series pantograph type and position:** unverified.
 - **Other trains:** simple far-view box shapes.
 
-Controls: Chase / Trackside / Overview cameras, time speed 1×–300×, persistence and glow sliders. Drag to orbit, pinch or scroll to zoom.
+Controls:
+- **Chase / Overview:** one continuous orbit camera. Zoom out from the train and it carries on into the overview. Close in, it turns with the train; far out, it's fixed to the map and its centre drifts from the train to the whole line. The buttons fly between the two.
+- **Cinematic:** an automatic director that cuts between flyby, tracking, aerial, nose, overhead, tunnel-entrance and station shots.
+- **View menu:** persistence and glow sliders, plus layer toggles (terrain, coastline, rivers, motorways, trunk roads, JR lines, other railways).
+- Time speed 1×–300×. Drag to orbit, pinch or scroll to zoom.
 
 ## Rendering
 
@@ -39,6 +43,13 @@ Controls: Chase / Trackside / Overview cameras, time speed 1×–300×, persiste
 ```
 python3 osm_sanyo.py sanyo.json
 python3 build_line.py sanyo.json data/sanyo-line.js
+```
+
+Context layers (coastline, rivers, motorway and trunk roads, JR and other conventional railways) come the same way. The corridor is fetched in ~40 km tiles, each cached in `.cache/` so a re-run only fetches what failed. Then the layers are clipped to 12–20 km either side of the line and simplified:
+
+```
+python3 osm_context.py osm-context.json        # needs data/sanyo-line.js
+python3 build_context.py osm-context.json data/sanyo-context.js
 ```
 
 If `data/sanyo-line.js` is missing, the page falls back to a smooth curve through the stations.
