@@ -1,25 +1,678 @@
 {
-  "_note": "Every Shinkansen line, for tools/build_network.py. osm: route/way names in OpenStreetMap (regex prefixes). bbox: rough S,W,N,E to search in. Stations in running order; a station shared by two lines (e.g. Shin-Osaka) joins them in the network. mini: a mini-Shinkansen running on a conventional line.",
-  "lines": [
-    {"id": "tokaido", "ja": "東海道新幹線", "en": "Tokaido Shinkansen", "osm": ["東海道新幹線"], "bbox": [34.6, 135.4, 35.75, 139.85],
-     "stations": [["東京", "Tokyo"], ["品川", "Shinagawa"], ["新横浜", "Shin-Yokohama"], ["小田原", "Odawara"], ["熱海", "Atami"], ["三島", "Mishima"], ["新富士", "Shin-Fuji"], ["静岡", "Shizuoka"], ["掛川", "Kakegawa"], ["浜松", "Hamamatsu"], ["豊橋", "Toyohashi"], ["三河安城", "Mikawa-Anjo"], ["名古屋", "Nagoya"], ["岐阜羽島", "Gifu-Hashima"], ["米原", "Maibara"], ["京都", "Kyoto"], ["新大阪", "Shin-Osaka"]]},
-    {"id": "sanyo", "ja": "山陽新幹線", "en": "Sanyo Shinkansen", "osm": ["山陽新幹線"], "bbox": [33.4, 130.2, 35.0, 135.7],
-     "stations": [["新大阪", "Shin-Osaka"], ["新神戸", "Shin-Kobe"], ["西明石", "Nishi-Akashi"], ["姫路", "Himeji"], ["相生", "Aioi"], ["岡山", "Okayama"], ["新倉敷", "Shin-Kurashiki"], ["福山", "Fukuyama"], ["新尾道", "Shin-Onomichi"], ["三原", "Mihara"], ["東広島", "Higashi-Hiroshima"], ["広島", "Hiroshima"], ["新岩国", "Shin-Iwakuni"], ["徳山", "Tokuyama"], ["新山口", "Shin-Yamaguchi"], ["厚狭", "Asa"], ["新下関", "Shin-Shimonoseki"], ["小倉", "Kokura"], ["博多", "Hakata"]]},
-    {"id": "kyushu", "ja": "九州新幹線", "en": "Kyushu Shinkansen", "osm": ["九州新幹線"], "bbox": [31.5, 130.2, 33.65, 130.75],
-     "stations": [["博多", "Hakata"], ["新鳥栖", "Shin-Tosu"], ["久留米", "Kurume"], ["筑後船小屋", "Chikugo-Funagoya"], ["新大牟田", "Shin-Omuta"], ["新玉名", "Shin-Tamana"], ["熊本", "Kumamoto"], ["新八代", "Shin-Yatsushiro"], ["新水俣", "Shin-Minamata"], ["出水", "Izumi"], ["川内", "Sendai"], ["鹿児島中央", "Kagoshima-Chuo"]]},
-    {"id": "nishikyushu", "ja": "西九州新幹線", "en": "Nishi-Kyushu Shinkansen", "osm": ["西九州新幹線"], "bbox": [32.7, 129.8, 33.25, 130.1],
-     "stations": [["武雄温泉", "Takeo-Onsen"], ["嬉野温泉", "Ureshino-Onsen"], ["新大村", "Shin-Omura"], ["諫早", "Isahaya"], ["長崎", "Nagasaki"]]},
-    {"id": "tohoku", "ja": "東北新幹線", "en": "Tohoku Shinkansen", "osm": ["東北新幹線"], "bbox": [35.6, 139.6, 40.9, 141.6],
-     "stations": [["東京", "Tokyo"], ["上野", "Ueno"], ["大宮", "Omiya"], ["小山", "Oyama"], ["宇都宮", "Utsunomiya"], ["那須塩原", "Nasushiobara"], ["新白河", "Shin-Shirakawa"], ["郡山", "Koriyama"], ["福島", "Fukushima"], ["白石蔵王", "Shiroishi-Zao"], ["仙台", "Sendai"], ["古川", "Furukawa"], ["くりこま高原", "Kurikoma-Kogen"], ["一ノ関", "Ichinoseki"], ["水沢江刺", "Mizusawa-Esashi"], ["北上", "Kitakami"], ["新花巻", "Shin-Hanamaki"], ["盛岡", "Morioka"], ["いわて沼宮内", "Iwate-Numakunai"], ["二戸", "Ninohe"], ["八戸", "Hachinohe"], ["七戸十和田", "Shichinohe-Towada"], ["新青森", "Shin-Aomori"]]},
-    {"id": "hokkaido", "ja": "北海道新幹線", "en": "Hokkaido Shinkansen", "osm": ["北海道新幹線"], "bbox": [40.7, 140.2, 41.95, 140.8],
-     "stations": [["新青森", "Shin-Aomori"], ["奥津軽いまべつ", "Okutsugaru-Imabetsu"], ["木古内", "Kikonai"], ["新函館北斗", "Shin-Hakodate-Hokuto"]]},
-    {"id": "joetsu", "ja": "上越新幹線", "en": "Joetsu Shinkansen", "osm": ["上越新幹線"], "bbox": [35.85, 138.8, 37.95, 139.7],
-     "stations": [["大宮", "Omiya"], ["熊谷", "Kumagaya"], ["本庄早稲田", "Honjo-Waseda"], ["高崎", "Takasaki"], ["上毛高原", "Jomo-Kogen"], ["越後湯沢", "Echigo-Yuzawa"], ["浦佐", "Urasa"], ["長岡", "Nagaoka"], ["燕三条", "Tsubame-Sanjo"], ["新潟", "Niigata"]]},
-    {"id": "hokuriku", "ja": "北陸新幹線", "en": "Hokuriku Shinkansen", "osm": ["北陸新幹線"], "bbox": [35.6, 135.9, 37.15, 139.1],
-     "stations": [["高崎", "Takasaki"], ["安中榛名", "Annaka-Haruna"], ["軽井沢", "Karuizawa"], ["佐久平", "Sakudaira"], ["上田", "Ueda"], ["長野", "Nagano"], ["飯山", "Iiyama"], ["上越妙高", "Joetsumyoko"], ["糸魚川", "Itoigawa"], ["黒部宇奈月温泉", "Kurobe-Unazukionsen"], ["富山", "Toyama"], ["新高岡", "Shin-Takaoka"], ["金沢", "Kanazawa"], ["小松", "Komatsu"], ["加賀温泉", "Kagaonsen"], ["芦原温泉", "Awaraonsen"], ["福井", "Fukui"], ["越前たけふ", "Echizen-Takefu"], ["敦賀", "Tsuruga"]]},
-    {"id": "yamagata", "ja": "山形新幹線", "en": "Yamagata Shinkansen", "osm": ["奥羽本線", "奥羽線"], "mini": true, "bbox": [37.7, 139.95, 38.8, 140.5],
-     "stations": [["福島", "Fukushima"], ["米沢", "Yonezawa"], ["高畠", "Takahata"], ["赤湯", "Akayu"], ["かみのやま温泉", "Kaminoyama-Onsen"], ["山形", "Yamagata"], ["天童", "Tendo"], ["さくらんぼ東根", "Sakurambo-Higashine"], ["村山", "Murayama"], ["大石田", "Oishida"], ["新庄", "Shinjo"]]},
-    {"id": "akita", "ja": "秋田新幹線", "en": "Akita Shinkansen", "osm": ["田沢湖線", "奥羽本線", "奥羽線"], "mini": true, "bbox": [39.4, 140.0, 39.8, 141.2],
-     "stations": [["盛岡", "Morioka"], ["雫石", "Shizukuishi"], ["田沢湖", "Tazawako"], ["角館", "Kakunodate"], ["大曲", "Omagari"], ["秋田", "Akita"]]}
-  ]
+ "_note": "Every Shinkansen line, for tools/build_network.py. osm: route/way names in OpenStreetMap (regex prefixes). bbox: rough S,W,N,E to search in. Stations in running order; a station shared by two lines (e.g. Shin-Osaka) joins them in the network. mini: a mini-Shinkansen running on a conventional line.",
+ "lines": [
+  {
+   "id": "tokaido",
+   "ja": "東海道新幹線",
+   "en": "Tokaido Shinkansen",
+   "osm": [
+    "東海道新幹線"
+   ],
+   "bbox": [
+    34.6,
+    135.4,
+    35.75,
+    139.85
+   ],
+   "stations": [
+    [
+     "東京",
+     "Tokyo"
+    ],
+    [
+     "品川",
+     "Shinagawa"
+    ],
+    [
+     "新横浜",
+     "Shin-Yokohama"
+    ],
+    [
+     "小田原",
+     "Odawara"
+    ],
+    [
+     "熱海",
+     "Atami"
+    ],
+    [
+     "三島",
+     "Mishima"
+    ],
+    [
+     "新富士",
+     "Shin-Fuji"
+    ],
+    [
+     "静岡",
+     "Shizuoka"
+    ],
+    [
+     "掛川",
+     "Kakegawa"
+    ],
+    [
+     "浜松",
+     "Hamamatsu"
+    ],
+    [
+     "豊橋",
+     "Toyohashi"
+    ],
+    [
+     "三河安城",
+     "Mikawa-Anjo"
+    ],
+    [
+     "名古屋",
+     "Nagoya"
+    ],
+    [
+     "岐阜羽島",
+     "Gifu-Hashima"
+    ],
+    [
+     "米原",
+     "Maibara"
+    ],
+    [
+     "京都",
+     "Kyoto"
+    ],
+    [
+     "新大阪",
+     "Shin-Osaka"
+    ]
+   ]
+  },
+  {
+   "id": "sanyo",
+   "ja": "山陽新幹線",
+   "en": "Sanyo Shinkansen",
+   "osm": [
+    "山陽新幹線"
+   ],
+   "bbox": [
+    33.4,
+    130.2,
+    35.0,
+    135.7
+   ],
+   "stations": [
+    [
+     "新大阪",
+     "Shin-Osaka"
+    ],
+    [
+     "新神戸",
+     "Shin-Kobe"
+    ],
+    [
+     "西明石",
+     "Nishi-Akashi"
+    ],
+    [
+     "姫路",
+     "Himeji"
+    ],
+    [
+     "相生",
+     "Aioi"
+    ],
+    [
+     "岡山",
+     "Okayama"
+    ],
+    [
+     "新倉敷",
+     "Shin-Kurashiki"
+    ],
+    [
+     "福山",
+     "Fukuyama"
+    ],
+    [
+     "新尾道",
+     "Shin-Onomichi"
+    ],
+    [
+     "三原",
+     "Mihara"
+    ],
+    [
+     "東広島",
+     "Higashi-Hiroshima"
+    ],
+    [
+     "広島",
+     "Hiroshima"
+    ],
+    [
+     "新岩国",
+     "Shin-Iwakuni"
+    ],
+    [
+     "徳山",
+     "Tokuyama"
+    ],
+    [
+     "新山口",
+     "Shin-Yamaguchi"
+    ],
+    [
+     "厚狭",
+     "Asa"
+    ],
+    [
+     "新下関",
+     "Shin-Shimonoseki"
+    ],
+    [
+     "小倉",
+     "Kokura"
+    ],
+    [
+     "博多",
+     "Hakata"
+    ]
+   ]
+  },
+  {
+   "id": "kyushu",
+   "ja": "九州新幹線",
+   "en": "Kyushu Shinkansen",
+   "osm": [
+    "九州新幹線"
+   ],
+   "bbox": [
+    31.5,
+    130.2,
+    33.65,
+    130.75
+   ],
+   "stations": [
+    [
+     "博多",
+     "Hakata"
+    ],
+    [
+     "新鳥栖",
+     "Shin-Tosu"
+    ],
+    [
+     "久留米",
+     "Kurume"
+    ],
+    [
+     "筑後船小屋",
+     "Chikugo-Funagoya"
+    ],
+    [
+     "新大牟田",
+     "Shin-Omuta"
+    ],
+    [
+     "新玉名",
+     "Shin-Tamana"
+    ],
+    [
+     "熊本",
+     "Kumamoto"
+    ],
+    [
+     "新八代",
+     "Shin-Yatsushiro"
+    ],
+    [
+     "新水俣",
+     "Shin-Minamata"
+    ],
+    [
+     "出水",
+     "Izumi"
+    ],
+    [
+     "川内",
+     "Sendai"
+    ],
+    [
+     "鹿児島中央",
+     "Kagoshima-Chuo"
+    ]
+   ]
+  },
+  {
+   "id": "nishikyushu",
+   "ja": "西九州新幹線",
+   "en": "Nishi-Kyushu Shinkansen",
+   "osm": [
+    "西九州新幹線"
+   ],
+   "bbox": [
+    32.7,
+    129.8,
+    33.25,
+    130.1
+   ],
+   "stations": [
+    [
+     "武雄温泉",
+     "Takeo-Onsen"
+    ],
+    [
+     "嬉野温泉",
+     "Ureshino-Onsen"
+    ],
+    [
+     "新大村",
+     "Shin-Omura"
+    ],
+    [
+     "諫早",
+     "Isahaya"
+    ],
+    [
+     "長崎",
+     "Nagasaki"
+    ]
+   ]
+  },
+  {
+   "id": "tohoku",
+   "ja": "東北新幹線",
+   "en": "Tohoku Shinkansen",
+   "osm": [
+    "東北新幹線"
+   ],
+   "bbox": [
+    35.6,
+    139.6,
+    40.9,
+    141.6
+   ],
+   "stations": [
+    [
+     "東京",
+     "Tokyo"
+    ],
+    [
+     "上野",
+     "Ueno"
+    ],
+    [
+     "大宮",
+     "Omiya"
+    ],
+    [
+     "小山",
+     "Oyama"
+    ],
+    [
+     "宇都宮",
+     "Utsunomiya"
+    ],
+    [
+     "那須塩原",
+     "Nasushiobara"
+    ],
+    [
+     "新白河",
+     "Shin-Shirakawa"
+    ],
+    [
+     "郡山",
+     "Koriyama"
+    ],
+    [
+     "福島",
+     "Fukushima"
+    ],
+    [
+     "白石蔵王",
+     "Shiroishi-Zao"
+    ],
+    [
+     "仙台",
+     "Sendai"
+    ],
+    [
+     "古川",
+     "Furukawa"
+    ],
+    [
+     "くりこま高原",
+     "Kurikoma-Kogen"
+    ],
+    [
+     "一ノ関",
+     "Ichinoseki"
+    ],
+    [
+     "水沢江刺",
+     "Mizusawa-Esashi"
+    ],
+    [
+     "北上",
+     "Kitakami"
+    ],
+    [
+     "新花巻",
+     "Shin-Hanamaki"
+    ],
+    [
+     "盛岡",
+     "Morioka"
+    ],
+    [
+     "いわて沼宮内",
+     "Iwate-Numakunai"
+    ],
+    [
+     "二戸",
+     "Ninohe"
+    ],
+    [
+     "八戸",
+     "Hachinohe"
+    ],
+    [
+     "七戸十和田",
+     "Shichinohe-Towada"
+    ],
+    [
+     "新青森",
+     "Shin-Aomori"
+    ]
+   ]
+  },
+  {
+   "id": "hokkaido",
+   "ja": "北海道新幹線",
+   "en": "Hokkaido Shinkansen",
+   "osm": [
+    "北海道新幹線",
+    "海峡線"
+   ],
+   "bbox": [
+    40.7,
+    140.2,
+    41.95,
+    140.8
+   ],
+   "stations": [
+    [
+     "新青森",
+     "Shin-Aomori"
+    ],
+    [
+     "奥津軽いまべつ",
+     "Okutsugaru-Imabetsu"
+    ],
+    [
+     "木古内",
+     "Kikonai"
+    ],
+    [
+     "新函館北斗",
+     "Shin-Hakodate-Hokuto"
+    ]
+   ]
+  },
+  {
+   "id": "joetsu",
+   "ja": "上越新幹線",
+   "en": "Joetsu Shinkansen",
+   "osm": [
+    "上越新幹線"
+   ],
+   "bbox": [
+    35.85,
+    138.8,
+    37.95,
+    139.7
+   ],
+   "stations": [
+    [
+     "大宮",
+     "Omiya"
+    ],
+    [
+     "熊谷",
+     "Kumagaya"
+    ],
+    [
+     "本庄早稲田",
+     "Honjo-Waseda"
+    ],
+    [
+     "高崎",
+     "Takasaki"
+    ],
+    [
+     "上毛高原",
+     "Jomo-Kogen"
+    ],
+    [
+     "越後湯沢",
+     "Echigo-Yuzawa"
+    ],
+    [
+     "浦佐",
+     "Urasa"
+    ],
+    [
+     "長岡",
+     "Nagaoka"
+    ],
+    [
+     "燕三条",
+     "Tsubame-Sanjo"
+    ],
+    [
+     "新潟",
+     "Niigata"
+    ]
+   ]
+  },
+  {
+   "id": "hokuriku",
+   "ja": "北陸新幹線",
+   "en": "Hokuriku Shinkansen",
+   "osm": [
+    "北陸新幹線"
+   ],
+   "bbox": [
+    35.6,
+    135.9,
+    37.15,
+    139.1
+   ],
+   "stations": [
+    [
+     "高崎",
+     "Takasaki"
+    ],
+    [
+     "安中榛名",
+     "Annaka-Haruna"
+    ],
+    [
+     "軽井沢",
+     "Karuizawa"
+    ],
+    [
+     "佐久平",
+     "Sakudaira"
+    ],
+    [
+     "上田",
+     "Ueda"
+    ],
+    [
+     "長野",
+     "Nagano"
+    ],
+    [
+     "飯山",
+     "Iiyama"
+    ],
+    [
+     "上越妙高",
+     "Joetsumyoko"
+    ],
+    [
+     "糸魚川",
+     "Itoigawa"
+    ],
+    [
+     "黒部宇奈月温泉",
+     "Kurobe-Unazukionsen"
+    ],
+    [
+     "富山",
+     "Toyama"
+    ],
+    [
+     "新高岡",
+     "Shin-Takaoka"
+    ],
+    [
+     "金沢",
+     "Kanazawa"
+    ],
+    [
+     "小松",
+     "Komatsu"
+    ],
+    [
+     "加賀温泉",
+     "Kagaonsen"
+    ],
+    [
+     "芦原温泉",
+     "Awaraonsen"
+    ],
+    [
+     "福井",
+     "Fukui"
+    ],
+    [
+     "越前たけふ",
+     "Echizen-Takefu"
+    ],
+    [
+     "敦賀",
+     "Tsuruga"
+    ]
+   ]
+  },
+  {
+   "id": "yamagata",
+   "ja": "山形新幹線",
+   "en": "Yamagata Shinkansen",
+   "osm": [
+    "山形新幹線",
+    "奥羽本線",
+    "奥羽線"
+   ],
+   "mini": true,
+   "bbox": [
+    37.7,
+    139.95,
+    38.8,
+    140.5
+   ],
+   "stations": [
+    [
+     "福島",
+     "Fukushima"
+    ],
+    [
+     "米沢",
+     "Yonezawa"
+    ],
+    [
+     "高畠",
+     "Takahata"
+    ],
+    [
+     "赤湯",
+     "Akayu"
+    ],
+    [
+     "かみのやま温泉",
+     "Kaminoyama-Onsen"
+    ],
+    [
+     "山形",
+     "Yamagata"
+    ],
+    [
+     "天童",
+     "Tendo"
+    ],
+    [
+     "さくらんぼ東根",
+     "Sakurambo-Higashine"
+    ],
+    [
+     "村山",
+     "Murayama"
+    ],
+    [
+     "大石田",
+     "Oishida"
+    ],
+    [
+     "新庄",
+     "Shinjo"
+    ]
+   ]
+  },
+  {
+   "id": "akita",
+   "ja": "秋田新幹線",
+   "en": "Akita Shinkansen",
+   "osm": [
+    "秋田新幹線",
+    "田沢湖線",
+    "奥羽本線",
+    "奥羽線",
+    "東北本線"
+   ],
+   "mini": true,
+   "bbox": [
+    39.4,
+    140.0,
+    39.8,
+    141.2
+   ],
+   "stations": [
+    [
+     "盛岡",
+     "Morioka"
+    ],
+    [
+     "雫石",
+     "Shizukuishi"
+    ],
+    [
+     "田沢湖",
+     "Tazawako"
+    ],
+    [
+     "角館",
+     "Kakunodate"
+    ],
+    [
+     "大曲",
+     "Omagari"
+    ],
+    [
+     "秋田",
+     "Akita"
+    ]
+   ]
+  }
+ ]
 }
