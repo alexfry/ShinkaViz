@@ -230,6 +230,7 @@ function carGeo(len,nf,nr){const xs=[],NK=48;
  for(let m=0;m<MR;m++){idx.push(c0,m,(m+1)%MR,c0+1,(R-1)*MR+(m+1)%MR,(R-1)*MR+m);}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g;}
 const HB=[.45,.62,.95],HS=[.1,.3,1.0],HC=[.8,.9,1.0],HG=[.25,.4,.6],HPn=[.6,.8,1.0];
+const GLASS=[[[2.946,-0.377],[3.067,-0.359],[3.196,-0.359],[3.325,-0.359],[3.454,-0.359],[3.565,-0.415],[3.67,-0.489],[3.776,-0.563],[3.881,-0.637],[3.987,-0.71],[4.024,-0.82],[3.909,-0.862],[3.781,-0.859],[3.653,-0.841],[3.53,-0.804],[3.409,-0.76],[3.29,-0.711],[3.176,-0.652],[3.067,-0.583],[2.972,-0.5]],[[2.964,0.467],[3.056,0.559],[3.148,0.651],[3.252,0.728],[3.37,0.78],[3.493,0.823],[3.618,0.86],[3.745,0.885],[3.874,0.898],[4.004,0.898],[4.059,0.824],[3.969,0.734],[3.863,0.659],[3.756,0.585],[3.65,0.51],[3.543,0.436],[3.426,0.395],[3.296,0.395],[3.166,0.395],[3.036,0.395]],[[3.808,-0.126],[3.963,0.03],[4.172,0.072],[4.394,0.072],[4.616,0.072],[4.838,0.072],[5.06,0.072],[5.282,0.072],[5.407,-0.036],[5.407,-0.258],[5.407,-0.48],[5.383,-0.699],[5.252,-0.847],[5.032,-0.862],[4.81,-0.843],[4.594,-0.794],[4.384,-0.724],[4.185,-0.626],[4.003,-0.5],[3.852,-0.339]],[[3.952,0.251],[4.022,0.427],[4.161,0.555],[4.305,0.678],[4.462,0.781],[4.643,0.832],[4.829,0.869],[5.017,0.88],[5.206,0.88],[5.388,0.863],[5.407,0.682],[5.407,0.493],[5.39,0.308],[5.24,0.216],[5.051,0.216],[4.862,0.216],[4.673,0.216],[4.484,0.216],[4.294,0.216],[4.105,0.216]],[[5.551,0.647],[5.611,0.758],[5.734,0.79],[5.863,0.788],[5.983,0.743],[6.099,0.687],[6.21,0.621],[6.316,0.548],[6.415,0.466],[6.485,0.362],[6.429,0.25],[6.307,0.234],[6.178,0.234],[6.05,0.234],[5.921,0.234],[5.792,0.234],[5.663,0.234],[5.551,0.26],[5.551,0.389],[5.551,0.518]],[[5.551,-0.539],[5.618,-0.445],[5.736,-0.431],[5.857,-0.431],[5.979,-0.431],[6.1,-0.431],[6.221,-0.431],[6.342,-0.431],[6.461,-0.437],[6.485,-0.544],[6.439,-0.652],[6.338,-0.716],[6.228,-0.763],[6.108,-0.781],[5.988,-0.795],[5.868,-0.81],[5.748,-0.824],[5.627,-0.826],[5.551,-0.781],[5.551,-0.66]]];
 function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  /* x for a distance d back from this car's nose; dOf for the reverse */
  const xAt=d=>nf?len/2-d:nr?-len/2+d:null,dOf=x=>nf?len/2-x:nr?x+len/2:1e9;
@@ -238,7 +239,7 @@ function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  const lon=(y,c,dMin=0)=>{for(const sd of[-1,1]){let p=null;for(const x of xs){const z=dOf(x)>=dMin?zOn(x,y):null;if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}};
  const along=(th,c)=>{let p=null;for(const x of xs){const q=sec(th,P(x),.03),v=[x,q[1],q[0]];if(p)S.add(p,v,c);p=v;}};
  /* livery, heights from the drawing */
- along(1.0,mul(HB,.7));along(Math.PI-1.0,mul(HB,.7));          /* blue-grey roof edge (3.45 m on the body) */
+ along(1.0,mul(HS,3.2));along(Math.PI-1.0,mul(HS,3.2));          /* blue-grey roof edge (3.45 m on the body) */
  lon(2.77,mul(HB,1.25),11.2);lon(2.19,mul(HB,1.0),11.2);         /* dark window band */
  lon(2.15,mul(HS,3.2),11.2);lon(1.89,mul(HS,3.2),11.2);          /* navy stripe */
  lon(1.24,mul(HB,.45),4);                                        /* underframe line */
@@ -253,9 +254,10 @@ function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  /* cockpit: canopy fairing 2.75-9.2 m (half-width 0.85), glazing 3.1-6.4 m with its frames */
  const nose=()=>{const pt=(d,z,gr)=>{const x=xAt(d);return [x,topAt(P(x),z,gr),z];},cc=mul(HC,2.4),ci=mul(HC,1.3),cf=mul(HB,1.3);
   const loop=(d0,d1,hw,peak,col)=>{for(const sd of[-1,1]){let p=null;for(let k=0;k<=28;k++){const u=k/28,f=u<peak?Math.sin(Math.PI/2*u/peak):Math.cos(Math.PI/2*(u-peak)/(1-peak)),q=pt(d0+(d1-d0)*u,sd*hw*Math.pow(Math.max(0,f),.55),.04);if(p)S.add(p,q,col);p=q;}}};
-  loop(2.75,9.2,.85,.45,cf);loop(3.1,6.4,.66,.55,cc);
-  {const d=5.45,hw=.66*Math.pow(Math.cos(Math.PI/2*(d-3.1-.55*3.3)/(.45*3.3)),.55);let p=null;for(let k=0;k<=8;k++){const q=pt(d,-hw+2*hw*k/8,.05);if(p)S.add(p,q,ci);p=q;}}
-  {let p=null;for(let k=0;k<=6;k++){const q=pt(5.45+.95*k/6,0,.05);if(p)S.add(p,q,ci);p=q;}}
+  loop(2.66,9.2,1.1,.42,cf);
+  /* glazing traced from the plan view: [d, z] outlines, z>0 = right-hand side. Note the off-centre frame and unequal rear panes. */
+  for(const pane of GLASS){let p=null;for(let k=0;k<=pane.length;k++){const [d,z]=pane[k%pane.length],q=pt(d,z,.05);if(p)S.add(p,q,cc);p=q;}}
+  for(const arm of[[[4.06,.13],[4.5,.28],[5.02,.38]],[[4.06,.13],[4.6,-.12],[5.02,-.19]]]){let p=null;for(const [d,z] of arm){const q=pt(d,z,.09);if(p)S.add(p,q,mul(HB,.8));p=q;}}
   {let p=null;for(let k=0;k<=10;k++){const q=pt(2.75*k/10,0,.03);if(p)S.add(p,q,mul(HB,1.3));p=q;}}};
  if(nf||nr)nose();
  along(0,mul(HB,.5));along(Math.PI,mul(HB,.5));                  /* waist */
