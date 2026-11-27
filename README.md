@@ -11,7 +11,7 @@ The current test case is the **500 series** on the Sanyo Shinkansen (Shin-Osaka 
 What is real so far:
 - Track alignment, tunnels (51%) and viaducts (36%) from OpenStreetMap, 553.5 km Shin-Osaka – Hakata
 - Station locations and names (Japanese and English)
-- Approximate 500 series proportions: 8 cars, 15 m nose, near-circular body, livery stripes
+- Approximate 500 series proportions: 8 cars, 15 m conical nose with a raised teardrop canopy, near-circular body with a skirt down over the bogies, 17.5 m bogie centres, livery stripes
 
 What is placeholder:
 - **Track layout at stations:** passing loops and platforms are generic, not the real layouts.
@@ -22,7 +22,8 @@ What is placeholder:
 
 Controls:
 - **Chase / Overview:** one continuous orbit camera. Zoom out from the train and it carries on into the overview. Close in, it turns with the train; far out, it's fixed to the map and its centre drifts from the train to the whole line. The buttons fly between the two.
-- **Cinematic:** an automatic director that cuts between flyby, tracking, aerial, nose, overhead, tunnel-entrance and station shots.
+- **Cinematic:** an automatic director that cuts between shots: a short flyby, tracking alongside, aerial orbit, aerial catching up and aerial left behind, nose, overhead, and tunnel entrance. It cuts to the platform as the 500 series arrives at each stop, and holds there while it stands.
+- **Platform:** stand on any station's platform, in either direction. Drag to look around and pinch to zoom. A departure board lists the next trains and whether each stops or passes through.
 - **View menu:** persistence and glow sliders, plus layer toggles (terrain, coastline, rivers, motorways, trunk roads, JR lines, other railways).
 - Time speed 1×–300×. Drag to orbit, pinch or scroll to zoom.
 
