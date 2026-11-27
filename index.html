@@ -66,7 +66,8 @@ input[type=range]{width:110px;accent-color:var(--acc)}
     <span class="k">位置 Position</span><span class="v" id="km"></span></div></div>
 </div>
 <div id="ui">
-  <div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="plat">Platform</button></div>
+  <div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="plat">Platform</button><button data-m="board">On board</button></div>
+  <span id="obUi" class="seg" hidden><button data-v="front" class="on">前面 Cab</button><button data-v="left">左 Left</button><button data-v="right">右 Right</button></span>
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
   <div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div>
@@ -216,6 +217,11 @@ for(let i=0;i<=N;i++){if(!BRG[i]||TUN[i])continue;const g=Math.max(hs[i],0),top=
 for(let i=1;i<=N;i++){if(TUN[i]===TUN[i-1])continue;const j=TUN[i]?i:i-1;let p=null;
  for(let k=0;k<=24;k++){const t=k/24;let u,v;if(t<.2){u=-4.8;v=t/.2*3.5;}else if(t>.8){u=4.8;v=(1-t)/.2*3.5;}else{const an=Math.PI*(1-(t-.2)/.6);u=4.8*Math.cos(an);v=3.5+4.8*Math.sin(an);}
   const q=sp(j,u);q[1]+=v-.5;if(p)sS.add(p,q,mul(PORT,1.2));p=q;}}
+/* tunnel bores: an arch ring every 50 m plus crown, shoulder and wall-foot lines, so tunnels read from inside and out */
+const sTun=new Seg(),TUNC=[.12,.32,.5],arch=(t)=>{if(t<.2)return [-4.8,t/.2*3.5];if(t>.8)return [4.8,(1-t)/.2*3.5];const an=Math.PI*(1-(t-.2)/.6);return [4.8*Math.cos(an),3.5+4.8*Math.sin(an)];};
+for(let i=0;i<=N;i++){if(!TUN[i])continue;let p=null;for(let k=0;k<=16;k++){const [u,v]=arch(k/16),q=sp(i,u);q[1]+=v-.5;if(p)sTun.add(p,q,TUNC);p=q;}}
+for(const t of[0,.25,.5,.75,1]){const [u,v]=arch(t);let p=null;for(let i=0;i<=N;i++){if(!TUN[i]){p=null;continue;}const q=sp(i,u);q[1]+=v-.5;if(p)sTun.add(p,q,mul(TUNC,t===.5?.9:.6));p=q;}}
+const tunMat=lineMat();scene.add(sTun.mesh(tunMat));
 const contourObj=sC.mesh(contourMat);scene.add(contourObj,sT.mesh(trackMat),sW.mesh(wireMat),sS.mesh(stationMat));
 /* OpenStreetMap context layers (data/sanyo-context.js, from build_context.py) */
 const CTXL={coast:{c:[.12,.5,.75],k:1.3,ja:'海岸線',en:'Coastline'},river:{c:[.1,.35,.8],k:1.0,ja:'河川',en:'Rivers'},motorway:{c:[1,.45,.1],k:.75,ja:'高速道路',en:'Motorways'},
@@ -309,9 +315,10 @@ function liveUpdate(now){if(!LIVE||now-LTM.last<250)return;LTM.last=now;
 const NPn=61,NPs=100,NPh=(NPn-1)/2*NPs,npSegs=2*NPn*(NPn-1),npPos=new Float32Array(npSegs*6),npCol=new Float32Array(npSegs*6),npH=new Float32Array(NPn*NPn);
 const npG=new THREE.BufferGeometry();npG.setAttribute('position',new THREE.BufferAttribute(npPos,3));npG.setAttribute('col',new THREE.BufferAttribute(npCol,3));
 const npL=new THREE.LineSegments(npG,patchMat);npL.frustumCulled=false;scene.add(npL);
-const SEA=[.03,.08,.16],LAND=[.05,.17,.22];let npCx=1e30,npCz=1e30;
-function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs;if(Math.abs(cx-npCx)<300&&Math.abs(cz-npCz)<300)return;npCx=cx;npCz=cz;
- for(let i=0;i<NPn;i++){const X=cx-NPh+i*NPs,zt=zAt(X);for(let j=0;j<NPn;j++){const Zz=cz-NPh+j*NPs,hh=LIVE?heightAt(X,Zz):Hx(X,Zz,zt);npH[j*NPn+i]=Math.max(hh===null?0:hh,0);}}
+const SEA=[.03,.08,.16],LAND=[.05,.17,.22];let npCx=1e30,npCz=1e30,npMiss=0,npT=0;
+/* follows whichever train is in view; rebuilt when it moves 300 m, or each second while live terrain tiles are still arriving */
+function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs,t=performance.now();if(Math.abs(cx-npCx)<300&&Math.abs(cz-npCz)<300&&!(npMiss&&t-npT>1000))return;npCx=cx;npCz=cz;npT=t;npMiss=0;
+ for(let i=0;i<NPn;i++){const X=cx-NPh+i*NPs,zt=zAt(X);for(let j=0;j<NPn;j++){const Zz=cz-NPh+j*NPs,hh=LIVE?heightAt(X,Zz):Hx(X,Zz,zt);if(hh===null)npMiss++;npH[j*NPn+i]=Math.max(hh===null?0:hh,0);}}
  let p=0;const put=(i,j)=>{const hh=npH[j*NPn+i],c=hh<=.01?SEA:LAND;npPos[p]=cx-NPh+i*NPs;npPos[p+1]=hh;npPos[p+2]=cz-NPh+j*NPs;npCol[p]=c[0];npCol[p+1]=c[1];npCol[p+2]=c[2];p+=3;};
  for(let j=0;j<NPn;j++)for(let i=0;i<NPn-1;i++){put(i,j);put(i+1,j);}
  for(let i=0;i<NPn;i++)for(let j=0;j<NPn-1;j++){put(i,j);put(i,j+1);}
@@ -321,10 +328,10 @@ function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs;if(M
 /* ---------- train models: a shared builder; each model is a spec (section tables + livery/cab decoration) ----------
    d = metres back from the nose tip. Tables: half-width, top of nose (without canopy), canopy rise, underside. */
 function tab(T,d){if(d<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(d<=T[i][0]){const [d0,v0]=T[i-1],[d1,v1]=T[i];return v0+(v1-v0)*(d-d0)/(d1-d0);}return T[T.length-1][1];}
-function catmull(P,K){/* centripetal Catmull-Rom through P, resampled to K points by arc length */
+function catmull(P,K){const SUB=K<0?-K:8;/* centripetal Catmull-Rom through P, resampled to K points by arc length */
  const D=[P[0],...P,P[P.length-1]],out=[];for(let i=1;i<D.length-2;i++){const [p0,p1,p2,p3]=[D[i-1],D[i],D[i+1],D[i+2]];
-  for(let k=0;k<8;k++){const t=k/8,t2=t*t,t3=t2*t;out.push([0,1].map(j=>.5*((2*p1[j])+(-p0[j]+p2[j])*t+(2*p0[j]-5*p1[j]+4*p2[j]-p3[j])*t2+(-p0[j]+3*p1[j]-3*p2[j]+p3[j])*t3)));}}
- out.push(P[P.length-1]);const L=[0];for(let i=1;i<out.length;i++)L.push(L[i-1]+Math.hypot(out[i][0]-out[i-1][0],out[i][1]-out[i-1][1]));
+  for(let k=0;k<SUB;k++){const t=k/SUB,t2=t*t,t3=t2*t;out.push([0,1].map(j=>.5*((2*p1[j])+(-p0[j]+p2[j])*t+(2*p0[j]-5*p1[j]+4*p2[j]-p3[j])*t2+(-p0[j]+3*p1[j]-3*p2[j]+p3[j])*t3)));}}
+ out.push(P[P.length-1]);if(K<0)return out;const L=[0];for(let i=1;i<out.length;i++)L.push(L[i-1]+Math.hypot(out[i][0]-out[i-1][0],out[i][1]-out[i-1][1]));
  const R=[];let j=0;for(let k=0;k<K;k++){const t=L[L.length-1]*k/(K-1);while(j<L.length-2&&L[j+1]<t)j++;const f=(t-L[j])/((L[j+1]-L[j])||1);R.push([out[j][0]+(out[j+1][0]-out[j][0])*f,out[j][1]+(out[j+1][1]-out[j][1])*f]);}return R;}
 function buildModel(SP){const {LN,TAB_W,TAB_T,TAB_C,TAB_B}=SP,NUf=typeof SP.NU==='function'?SP.NU:()=>SP.NU,BUMP=SP.bump||14,CUS=!!SP.section,KH=SP.KH||24,MR=CUS?2*KH-2:SP.MR;
  /* custom sections: half polyline from top centre, down the right side, to bottom centre */
@@ -338,9 +345,9 @@ function frontPoint(len,nf,nr,z,y){for(let d=0;d<=LN;d+=.02){const x=nf?len/2-d:
 function noseD(x,len,nf,nr){if(nf&&x>len/2-LN)return len/2-x;if(nr&&x<-len/2+LN)return x+len/2;return LN;}
 /* section params: [full width, underside, top (no canopy), canopy rise, d, waist height, lower exponent] */
 function prof(x,len,nf,nr){const d=Math.max(0,noseD(x,len,nf,nr)),yb0=tab(TAB_B,d),yt=tab(TAB_T,d);let yb=yb0;
- for(const xb of bogiesOf(len,nf,nr)){const u=Math.abs(x-xb)/2.1;if(u<1)yb=Math.max(yb,SP.skirt+.48*Math.sqrt(1-u*u));}
+ for(const xb of bogiesOf(len,nf,nr)){if(SP.cut){const u=(SP.cut[0]-Math.abs(x-xb))/.12;if(u>0)yb=Math.max(yb,yb0+(SP.cut[1]-yb0)*Math.min(1,u));}else{const u=Math.abs(x-xb)/2.1;if(u<1)yb=Math.max(yb,SP.skirt+.48*Math.sqrt(1-u*u));}}
  const p=[2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb0+SP.waist*(yt-yb0),SP.nl(d),NUf(d)];
- if(CUS){const H=catmull(SP.section(Math.min(d,LN),yb),KH);p.half=H;let mz=0,wi=0;for(let i=0;i<H.length;i++)if(H[i][0]>mz){mz=H[i][0];wi=i;}p[0]=2*mz;p[5]=H[wi][1];p.wi=wi;}
+ if(CUS){const H=catmull(SP.section(Math.min(d,LN),yb),SP.sub?-SP.sub:KH);p.half=H;let mz=0,wi=0;for(let i=0;i<H.length;i++)if(H[i][0]>mz){mz=H[i][0];wi=i;}p[0]=2*mz;p[5]=H[wi][1];p.wi=wi;}
  return p;}
 function sec(th,p,gr){if(p.half){const r=ringOf(p),n=r.length,f=(((th-Math.PI/2)/(2*Math.PI))%1+1)%1*n,i=Math.floor(f)%n,j=(i+1)%n,u=f-Math.floor(f),z=r[i][0]+(r[j][0]-r[i][0])*u,y=r[i][1]+(r[j][1]-r[i][1])*u,cy=p[5];const k=Math.hypot(z,y-cy)||1;return [z+z/k*gr,y+(y-cy)/k*gr];}
  const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?p[7]:p[6],b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,BUMP);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
@@ -375,7 +382,8 @@ function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  along(0,mul(HB,.5));along(Math.PI,mul(HB,.5));                  /* waist */
  /* bogies: 2.5 m wheelbase; end cars 5.7 m and 23.2 m from the tip, others 17.5 m centres. Wheels show through skirt cut-outs. */
  for(const xb of bogiesOf(len,nf,nr))for(const sd of[-1,1]){const zs=sd*(P(xb)[0]/2+.02),c=mul(HG,1.4);
-  let p=null;for(let k=0;k<=16;k++){const an=Math.PI*k/16,q=[xb-2.1*Math.cos(an),SP.skirt+.48*Math.sin(an),zs];if(p)S.add(p,q,mul(HB,.6));p=q;}
+  if(SP.fair){const sg=nr?1:-1,zf=sd*(P(xb)[0]/2*.96);for(const F of SP.fair){let p=null,f=null;for(const [dd,h] of F){const q=[xb+sg*dd,Math.max(.04,h),zf];if(p)S.add(p,q,mul(HB,.8));else f=q;p=q;}S.add(p,f,mul(HB,.8));}}
+  else{let p=null;for(let k=0;k<=16;k++){const an=Math.PI*k/16,q=[xb-2.1*Math.cos(an),SP.skirt+.48*Math.sin(an),zs];if(p)S.add(p,q,mul(HB,.6));p=q;}}
   for(const ax of[-1.25,1.25]){let p=null;for(let k=0;k<=20;k++){const an=k/20*Math.PI*2,q=[xb+ax+Math.cos(an)*.43,.43+Math.sin(an)*.43,sd*.75];if(p)S.add(p,q,c);p=q;}
    S.add([xb+ax,.43,sd*.75],[xb+ax,.43,sd*1.05],mul(HG,.8));}
   const fz=sd*1.05,fc=mul(HG,.9);S.add([xb-1.55,.3,fz],[xb+1.55,.3,fz],fc);S.add([xb-1.55,.62,fz],[xb+1.55,.62,fz],fc);S.add([xb-1.55,.3,fz],[xb-1.55,.62,fz],fc);S.add([xb+1.55,.3,fz],[xb+1.55,.62,fz],fc);}
@@ -407,7 +415,7 @@ const SPEC500={LN:15,MR:40,NU:2.3,skirt:.32,waist:.43,bog:[5.7,23.23],nl:d=>3+6*
   const loop=(d0,d1,hw,peak,col)=>{for(const sd of[-1,1]){let p=null;for(let k=0;k<=28;k++){const u=k/28,f=u<peak?Math.sin(Math.PI/2*u/peak):Math.cos(Math.PI/2*(u-peak)/(1-peak)),q=pt(d0+(d1-d0)*u,sd*hw*Math.pow(Math.max(0,f),.55),.04);if(p)S.add(p,q,col);p=q;}}};
   loop(2.66,9.2,1.1,.42,cf);
   /* glazing traced from the plan view: [d, z] outlines, z>0 = right-hand side. Note the off-centre frame and unequal rear panes. */
-  for(const pane of GLASS){let p=null;for(let k=0;k<=pane.length;k++){const [d,z]=pane[k%pane.length],q=pt(d,z,.05);if(p)S.add(p,q,cc);p=q;}}
+  for(const pane of GLASS){const sm=catmull([...pane,pane[0]],-4);let p=null;for(const [d,z] of sm){const q=pt(d,z,.05);if(p)S.add(p,q,cc);p=q;}}
   for(const arm of[[[4.06,.13],[4.5,.28],[5.02,.38]],[[4.06,.13],[4.6,-.12],[5.02,-.19]]]){let p=null;for(const [d,z] of arm){const q=pt(d,z,.09);if(p)S.add(p,q,mul(HB,.8));p=q;}}
   {let p=null;for(let k=0;k<=10;k++){const q=pt(2.75*k/10,0,.03);if(p)S.add(p,q,mul(HB,1.3));p=q;}}};
  if(nf||nr)nose();}};
@@ -415,32 +423,54 @@ const M500=buildModel(SPEC500);
 /* N700 family (N700A on Nozomi, 7000/8000 series on Sakura and Kodama). Fitted to an N700 Sakura design drawing
    (27.35 m end car: 6.1 m tip to bogie, 17.5 m bogie centres, 2.5 m wheelbase, 3.36 x 3.6 m section; measured at 38.3 px/m).
    Nose contours are traced in the front view and projected back onto the nose surface. */
-/* Nose features as 3D curves [d, z, height], by matching the drawing's side view (d, height) and front view (z, height) at equal
-   heights. B: the cab hump's U-shaped edge (starts on the centreline 2.2 m back); A1/A2: the double wing creases from the roof
-   corners down to the chin; L: the lower crease across the front above the headlights. */
-const N7A1=[[0,.16,.8],[.02,.18,.85],[.12,.28,1.16],[.45,.54,1.52],[1.6,.85,1.88],[3,1.16,2.3],[7,1.4,2.81],[8.6,1.5,3.33],[10.7,1.5,3.45]];
-const N7A2=[[.02,.1,.85],[.15,.18,1.21],[.55,.39,1.57],[2,.67,1.98],[5.2,.98,2.45],[7.6,1.19,2.97],[9.2,1.24,3.43],[10.7,1.24,3.5]];
-const N7B=[[0,0,0],[2.2,0,2.12],[2.4,.34,2.16],[3,.65,2.29],[4.4,.83,2.55],[6.6,.86,3.07],[9.6,.85,3.48],[10.7,.85,3.56]];
-const N7LC=[[.36,0],[.45,.4],[.8,.8],[1.2,1.2],[1.8,1.55],[2.6,1.66]];
+/* Nose features traced from the drawing. Creases as 3D curves [d, z, height], made by matching the side view (d, height) and
+   front view (z, height) at equal heights: B the cab hump's base (a U under the windscreen), A1/A2 the double wing creases from the
+   roof corners to the chin, C the outer side crease, L the crease over the headlights. Side-view lines [d, height]: the headlight
+   slot, the line running back from it, and the accent line below. Front-view lines [z, height]: the nose-cone outline (from each
+   headlight down and under the chin), the arc joining the headlights, the inner oval, and the windscreen outline. */
+const N7A1=[[-0.03,0.161,1.11],[0.81,0.314,1.745],[1.66,0.54,2.031],[2.5,0.69,2.17],[3.34,0.771,2.242],[4.19,0.835,2.3],[5.03,0.924,2.383],[5.88,1.054,2.523],[6.72,1.194,2.73],[7.56,1.293,2.985],[8.41,1.343,3.239],[9.25,1.364,3.409]];
+const N7A2=[[-0.03,0.201,1.114],[0.39,0.274,1.5],[0.81,0.354,1.745],[1.23,0.439,1.912],[1.65,0.521,2.029],[2.07,0.595,2.111],[2.49,0.658,2.169],[2.91,0.71,2.21],[3.33,0.755,2.241],[3.74,0.798,2.269],[4.16,0.849,2.298],[4.58,0.92,2.333]];
+const N7C=[[0.56,0.337,1.576],[1.27,0.431,1.78],[1.98,0.569,1.914],[2.69,0.718,2.006],[3.4,0.853,2.077],[4.11,0.977,2.142],[4.82,1.099,2.215],[5.54,1.222,2.305],[6.25,1.341,2.421],[6.96,1.447,2.569],[7.67,1.532,2.752],[8.38,1.588,2.97]];
+const N7LCR=[[0.78,0.425,1.589],[1.49,0.599,1.793],[2.2,0.884,1.896],[2.9,1.041,1.906],[3.61,1.048,1.906],[4.32,1.055,1.906],[5.03,1.213,1.893],[5.73,1.368,1.862],[6.44,1.465,1.834],[7.15,1.536,1.809],[7.86,1.597,1.784],[8.56,1.664,1.752]];
+const N7B=[[2.2,0.0,2.122],[2.77,0.585,2.214],[3.34,0.739,2.322],[3.91,0.807,2.414],[4.48,0.837,2.478],[5.05,0.86,2.549],[5.62,0.878,2.648],[6.18,0.882,2.825],[6.75,0.862,3.008],[7.32,0.842,3.151],[7.89,0.831,3.267],[8.46,0.832,3.358],[9.03,0.838,3.423],[9.6,0.848,3.477]];
+const N7WIN=[[-0.018,2.439],[0.085,2.44],[0.187,2.441],[0.29,2.443],[0.393,2.446],[0.496,2.452],[0.597,2.47],[0.656,2.551],[0.726,2.626],[0.773,2.716],[0.747,2.812],[0.679,2.889],[0.606,2.961],[0.516,2.992],[0.416,2.971],[0.316,2.945],[0.214,2.936],[0.112,2.949],[0.011,2.964],[-0.092,2.96],[-0.193,2.941],[-0.295,2.943],[-0.396,2.964],[-0.493,2.996],[-0.591,2.976],[-0.674,2.916],[-0.738,2.836],[-0.747,2.736],[-0.71,2.64],[-0.694,2.54],[-0.633,2.471],[-0.532,2.455],[-0.429,2.447],[-0.327,2.443],[-0.224,2.44],[-0.121,2.44]];
+const N7CONE=[[0.864,1.345],[0.942,1.295],[1.016,1.24],[1.082,1.175],[1.137,1.1],[1.176,1.016],[1.199,0.926],[1.205,0.834],[1.194,0.742],[1.166,0.654],[1.122,0.572],[1.063,0.501],[0.992,0.442],[0.911,0.396],[0.825,0.363],[0.735,0.34],[0.644,0.326],[0.551,0.317],[0.459,0.311],[0.366,0.307],[0.274,0.301],[0.181,0.294],[0.089,0.286],[-0.004,0.282]];
+const N7LIN=[[0.01,1.567],[0.095,1.559],[0.18,1.545],[0.264,1.527],[0.347,1.507],[0.43,1.485],[0.512,1.461],[0.595,1.437],[0.677,1.414],[0.76,1.391]];
+const N7OVI=[0.0, 0.781, 0.972, 0.425];
+const N7LAMP=[[0.778,1.377],[0.783,1.43],[0.841,1.452],[0.903,1.462],[0.966,1.466],[1.028,1.47],[1.091,1.476],[1.153,1.484],[1.216,1.49],[1.279,1.491],[1.341,1.487],[1.402,1.474],[1.453,1.439],[1.443,1.381],[1.39,1.348],[1.33,1.334],[1.267,1.33],[1.204,1.334],[1.142,1.337],[1.079,1.332],[1.017,1.323],[0.954,1.321],[0.892,1.328],[0.831,1.345]];
+const N7LLINE=[[1.588,1.458],[2.041,1.494],[2.494,1.526],[2.948,1.553],[3.402,1.576],[3.856,1.596],[4.31,1.612],[4.764,1.625],[5.218,1.635],[5.673,1.643],[6.127,1.648],[6.582,1.652],[7.036,1.654],[7.49,1.655]];
+const N7CYAN=[[1.307,1.216],[1.781,1.253],[2.256,1.287],[2.732,1.318],[3.207,1.347],[3.683,1.373],[4.158,1.396],[4.634,1.417],[5.11,1.435],[5.586,1.451],[6.062,1.464],[6.538,1.475],[7.014,1.484],[7.49,1.49]];
+const N7FAIR0=[[-1.255,-0.031],[-1.155,-0.024],[-1.057,-0.004],[-0.967,0.039],[-0.903,0.115],[-0.861,0.206],[-0.812,0.293],[-0.733,0.35],[-0.634,0.369],[-0.611,0.42],[-0.71,0.433],[-0.81,0.428],[-0.91,0.418],[-1.009,0.419],[-1.109,0.43],[-1.209,0.432],[-1.309,0.424],[-1.409,0.418],[-1.509,0.425],[-1.608,0.429],[-1.707,0.412],[-1.77,0.343],[-1.733,0.252],[-1.675,0.17],[-1.622,0.085],[-1.548,0.019],[-1.454,-0.014],[-1.355,-0.028]];
+const N7FAIR1=[[1.257,-0.035],[1.358,-0.026],[1.456,-0.004],[1.544,0.043],[1.603,0.124],[1.653,0.212],[1.704,0.299],[1.713,0.394],[1.623,0.43],[1.522,0.426],[1.422,0.414],[1.322,0.415],[1.222,0.426],[1.121,0.426],[1.021,0.416],[0.921,0.409],[0.821,0.422],[0.721,0.433],[0.62,0.428],[0.543,0.383],[0.64,0.365],[0.739,0.351],[0.801,0.273],[0.847,0.184],[0.897,0.096],[0.966,0.023],[1.057,-0.017],[1.157,-0.032]];
+const N7LL=[[0.7,0.98,1.4],[1.1,1.05,1.4],[1.45,1.12,1.42],[1.59,1.215,1.458],[2.08,1.269,1.497],[2.57,1.321,1.531],[3.07,1.372,1.56],[3.57,1.42,1.584],[4.07,1.465,1.604],[4.57,1.506,1.62],[5.07,1.542,1.632],[5.57,1.572,1.641],[6.08,1.595,1.648],[6.58,1.611,1.652],[7.09,1.62,1.654]];
+const N7CY=[[1.31,1.345,1.216],[1.82,1.4,1.256],[2.34,1.457,1.293],[2.86,1.509,1.326],[3.38,1.555,1.357],[3.91,1.597,1.384],[4.43,1.634,1.408],[4.96,1.666,1.429],[5.48,1.673,1.448],[6.01,1.673,1.463],[6.54,1.673,1.475],[7.07,1.673,1.484]];
 const col3=(T,k)=>T.map(r=>[r[0],r[k]]);
-const N7=d=>({A:[tab(col3(N7A1,1),d),tab(col3(N7A1,2),d)],B:[tab(col3(N7B,1),d),tab(col3(N7B,2),d)]});
-/* windscreen, front view [z, height]: mask shape with raised corner "ears"; frames split it into a centre pane and two corner panes */
-const N7WINF=[[-.78,2.74],[-.74,2.94],[-.65,3.02],[-.53,3.03],[-.44,2.97],[-.23,2.93],[0,2.92],[.23,2.93],[.44,2.97],[.53,3.03],[.65,3.02],[.74,2.94],[.78,2.74],[.72,2.56],[.6,2.46],[.29,2.42],[0,2.39],[-.29,2.42],[-.6,2.46],[-.72,2.56]];
-function specN700(liv){return {LN:10.7,KH:26,NU:4,skirt:.21,waist:.41,bog:[6.1,23.6],nl:()=>4,
+const N7at=(T,d)=>[tab(col3(T,1),d),tab(col3(T,2),d)];
+function specN700(liv){return {LN:10.7,KH:57,sub:4,NU:4,skirt:.21,waist:.41,bog:[6.1,23.6],nl:()=>4,cut:[1.8,.43],fair:[N7FAIR0,N7FAIR1],
  TAB_W:[[0,.3],[.06,.48],[.28,1.0],[.63,1.28],[1.15,1.44],[2.02,1.55],[2.89,1.6],[3.76,1.64],[4.98,1.67],[6,1.68],[10.7,1.68]],
  TAB_T:[[0,.99],[.05,1.17],[.1,1.28],[.16,1.36],[.26,1.49],[.37,1.59],[.52,1.7],[.78,1.78],[1.04,1.85],[1.31,1.93],[1.57,1.98],[2.09,2.09],[2.61,2.22],[3.13,2.32],[3.66,2.43],[4.2,2.57],[4.7,2.68],[5.2,2.8],[5.7,2.93],[6.27,3.12],[6.79,3.3],[7.31,3.37],[8.09,3.45],[8.88,3.52],[9.4,3.55],[10.2,3.58],[10.7,3.6]],
  TAB_C:[[3.7,0],[3.95,.12],[4.44,.2],[4.96,.17],[5.48,.18],[6,.17],[6.5,.08],[7,0]],
  TAB_B:[[0,.55],[.1,.5],[.2,.42],[.5,.4],[.75,.29],[1,.21],[10.7,.21]],
  HW:[[0,.8],[.7,1.42],[1.5,1.47],[9.5,1.62],[10.7,1.62]],
- section(d,yb){const W=tab(this.TAB_W,d),Tc=tab(this.TAB_T,d)+tab(this.TAB_C,d),hW=Math.max(yb+.1,tab(this.HW,d)),{A,B}=N7(d);
-  const hump=d>=2.2,zB=hump?Math.min(B[0],W*.6):.02,hB=hump?Math.min(B[1],Tc-.005):Tc-.002,zA=Math.min(Math.max(A[0],zB+.06),W*.9),hA=Math.min(A[1],hB-.03);
-  const P=[[0,Tc],[zB*.5,Tc-(Tc-hB)*.3],[zB,hB],[zA,hA],[zA+(W-zA)*.55,hA-(hA-hW)*.08],[zA+(W-zA)*.92,hA-(hA-hW)*.42],[W,hW],[W*.97,yb+(hW-yb)*.35],[W*.86,yb],[W*.43,yb],[0,yb]];
-  for(let i=1;i<P.length;i++)if(P[i][1]>P[i-1][1]&&i>2)P[i][1]=P[i-1][1]-.001;return P;},
+ /* section: top centre, the hump dome down to its base B, the wing creases, C, L, out to the widest point, then the underside */
+ section(d,yb){const W0=tab(this.TAB_W,d),Tc=tab(this.TAB_T,d)+tab(this.TAB_C,d),hW=Math.max(yb+.1,tab(this.HW,d)),P=[[0,Tc]];
+  /* always 14 control points so every ring has the same vertex count; inactive features collapse onto a neighbour */
+  let z=0,h=Tc;const add=(q,dz=.012)=>{const zz=Math.max(q[0],z+dz),hh=Math.min(q[1],h-.002);P.push([zz,hh]);z=zz;h=hh;};
+  const A1=N7at(N7A1,d),A2=d<=4.6?N7at(N7A2,d):[A1[0]-.012,A1[1]+.003],w=[A1,A2].sort((a,b)=>a[0]-b[0]),zA=w[0][0],hA=w[0][1];
+  const t=Math.max(0,Math.min(1,(d-2.2)/.6)),[zB,hB]=d>=2.2?N7at(N7B,d):[0,Tc];
+  for(const k of[1,2,3]){const f=k*.24,n=[zA*f,Tc+(hA-Tc)*Math.pow(f,1.6)],b=[[zB*.5,Tc-(Tc-hB)*.25],[zB*.8,Tc-(Tc-hB)*.62],[zB,hB]][k-1];add([n[0]+(b[0]-n[0])*t,n[1]+(b[1]-n[1])*t]);}
+  for(const q of w)add(q);
+  add(d>=.56?N7at(N7C,d):[z,h],.02);add(d>=.78?N7at(N7LCR,d):[z,h],.02);
+  add(d>=.7?N7at(N7LL,d):[z+(Math.max(W0,z+.1)-z)*.5,h-(h-hW)*.4],.02);           /* headlight line: the shoulder crease */
+  const W=Math.max(W0,z+.04);add([W,Math.min(hW,h-.01)],.015);
+  const yl=yb+(hW-yb)*.35,cy=d>=1.31?N7at(N7CY,d):null;                                 /* accent line, below the widest point */
+  if(cy&&cy[1]<P[P.length-1][1]-.02&&cy[1]>yl+.02)P.push([Math.min(cy[0],W),cy[1]]);else P.push([W*.995,(P[P.length-1][1]+yl)/2]);
+  P.push([W*.97,yl],[W*.86,yb],[W*.43,yb],[0,yb]);return P;},
  decorate({S,P,len,nf,nr,xAt,lon,rect,pt,pf,zOn}){
   /* livery heights from the drawing: windows 2.17-2.69 m, stripe 1.68-1.83 m (+ gold 1.62 m on Kyushu sets), grey lower band below 0.97 m */
-  if(liv==='noz'){lon(1.83,mul(HS,3.2),1.2);lon(1.68,mul(HS,3.2),1.2);}
+  if(liv==='noz'){lon(1.83,mul(HS,3.2),10.2);lon(1.68,mul(HS,3.2),10.2);}
   else{const nv=mul([.08,.2,.75],3);lon(1.83,nv,10.2);lon(1.68,nv,10.2);lon(1.62,[1.7,1.2,.3],10.2);}
-  lon(.97,mul(HB,.45),.5);
+  lon(.97,mul(HB,.45),.9);
   const end=nf||nr,doors=end?[xAt(9.05),nf?-len/2+3.3:len/2-3.3]:[-len/2+1.6,len/2-1.6];
   for(const d of doors){rect(d-.36,d+.36,1.38,3.16,mul(HB,1.2));rect(d-.16,d+.16,2.4,2.9,mul(HB,.8));}
   if(end){const a=xAt(8.4),b=xAt(7.8);rect(Math.min(a,b),Math.max(a,b),1.4,3.1,mul(HB,1.1));rect(Math.min(a,b)+.12,Math.max(a,b)-.12,2.5,3.0,mul(HC,1.4));}
@@ -449,30 +479,34 @@ function specN700(liv){return {LN:10.7,KH:26,NU:4,skirt:.21,waist:.41,bog:[6.1,2
   if(!end)return;
   const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
   /* surface helpers: upper-surface height at (d, z); d at which the upper surface reaches height h at lateral z */
-  const self=this,yAt=(d,z)=>{const x=xAt(d),p=P(x),H=p.half,a=Math.abs(z);for(let i=0;i<p.wi;i++){const [z0,y0]=H[i],[z1,y1]=H[i+1];if(a>=z0&&a<=z1)return y0+(y1-y0)*(a-z0)/((z1-z0)||1);}return H[p.wi][1];};
-  const onS=(d,z,g=.03)=>[xAt(d),yAt(d,z)+g,z*1.004];
+  const yAt=(d,z)=>{const x=xAt(d),p=P(x),H=p.half,a=Math.abs(z);for(let i=0;i<p.wi;i++){const [z0,y0]=H[i],[z1,y1]=H[i+1];if(a>=z0&&a<=z1)return y0+(y1-y0)*(a-z0)/((z1-z0)||1);}return H[p.wi][1];};
+  const onS=(d,z,g=.02)=>[xAt(d),yAt(d,z)+g,z*1.004];
   const dFor=(z,h,d0,d1)=>{let lo=d0,hi=d1;if(yAt(hi,z)<h)return null;for(let k=0;k<30;k++){const m=(lo+hi)/2;if(yAt(m,z)<h)lo=m;else hi=m;}return hi;};
-  const cr=(T,col,from=0)=>{for(const sd of[-1,1]){const o=[];const d0=Math.max(from,T[0][0]),d1=T[T.length-1][0];for(let d=d0;d<=d1+1e-6;d+=.08){o.push(onS(d,sd*tab(col3(T,1),d)));}poly(o,col);}};
-  cr(N7A1,mul(HB,1.7));cr(N7A2,mul(HB,1.3));cr(N7B,mul(HB,1.5),2.2);
-  {const o=[];for(let k=0;k<=24;k++){const z=-1.66+3.32*k/24,a=Math.abs(z),d=tab(N7LC.map(r=>[r[1],r[0]]),a);o.push(onS(d,z,.03));}poly(o,mul(HB,1.1));}
-  /* windscreen: front-view outline placed where the hump surface reaches each (z, height) */
-  const win=N7WINF.map(([z,h])=>{const d=dFor(z,h,2.5,8);return d===null?null:onS(d,z,.05);});
-  poly(win,mul(HC,2.6),true);
-  for(const zp of[-.44,.44]){const o=[];for(let k=0;k<=8;k++){const h=2.44+(2.97-2.44)*k/8,d=dFor(zp,h,2.5,8);o.push(d===null?null:onS(d,zp,.06));}poly(o,mul(HC,1.6));}
-  {const o=[];for(let k=0;k<=20;k++){const z=-.8+1.6*k/20,h=tab([[0,2.96],[.23,2.97],[.44,3.01],[.53,3.07],[.8,3.0]],Math.abs(z)),d=dFor(z,h,2.5,8.5);o.push(d===null?null:onS(d+.05,z,.08));}poly(o,mul(HB,1.8));}
-  poly([[.06,2.45],[.25,2.62],[.4,2.78]].map(([z,h])=>{const d=dFor(z,h,2.5,8);return d===null?null:onS(d,z,.09);}),mul(HB,.8));
-  /* headlight slots (plan view: d 0.8-1.5, z ~0.95, angled along the outline; side view height ~1.38 m) */
-  for(const sd of[-1,1]){const o=[];for(let k=0;k<=24;k++){const a=k/24*Math.PI*2,u=.36*Math.cos(a),v=.07*Math.sin(a),d=1.15+u*.94-v*.34,z=sd*(.95+u*.34+v*.94);o.push(onS(d,z,.03));}poly(o,mul(HC,1.8),true);}
-  /* waist line from the headlights back, and the lower line beneath it */
-  for(const sd of[-1,1])for(const [T,c] of[[[[.7,1.45],[1.5,1.47],[9.5,1.62]],mul(HB,.9)],[[[1.2,1.3],[7.8,1.5]],mul(HB,.6)]]){const o=[];for(let d=T[0][0];d<=T[T.length-1][0];d+=.15){const h=tab(T,d),x=xAt(d),z=zOn(x,h);o.push(z===null?null:[x,h,sd*z]);}poly(o,c);}
-  /* lower nose oval (front view: +-0.97 m, 0.36-1.2 m), on the forward-facing cap */
-  {const o=[];for(let k=0;k<64;k++){const a=k/64*Math.PI*2;o.push(pf(1.25*Math.cos(a),.85+.64*Math.sin(a)));}poly(o,mul(HB,1.0),true);}
-  {let p=null;for(let k=0;k<=12;k++){const q=onS(2.2*k/12,0,.03);if(p)S.add(p,q,mul(HB,1.1));p=q;}}}};}
+  const cr=(T,col,from=-1,to=99)=>{for(const sd of[-1,1]){const o=[],d0=Math.max(from,T[0][0],0),d1=Math.min(to,T[T.length-1][0]);for(let d=d0;d<=d1+1e-6;d+=.06)o.push(onS(d,sd*tab(col3(T,1),d)));poly(o,col);}};
+  cr(N7A1,mul(HB,1.7));cr(N7A2,mul(HB,1.3),0,4.6);cr(N7B,mul(HB,1.5),2.2);cr(N7C,mul(HB,1.2));cr(N7LCR,mul(HB,1.1));
+  /* side-view lines on the outer surface */
+  const side=(T,col,closed)=>{for(const sd of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01)];}),col,closed);};
+  const c3=(T,col,from=-1)=>{for(const sd of[-1,1]){const o=[];for(let d=Math.max(from,T[0][0]);d<=T[T.length-1][0]+1e-6;d+=.08){const [zz,hh]=N7at(T,d);o.push([xAt(d),hh+.01,sd*(zz+.012)]);}poly(o,col);}};
+  c3(N7LL,mul(HB,1.0),1.5);c3(N7CY,mul(HB,.8));
+  /* headlight: side-view slot outline, set along the shoulder crease (plan view puts it at z 0.96-1.17) */
+  for(const sd of[-1,1])poly(N7LAMP.map(([d,h])=>{const zz=N7at(N7LL,d)[0]+(1.4-h)*.5;return [xAt(d),h+.01,sd*(zz+.015)];}),mul(HC,1.9),true);
+  /* front-view lines on the forward-facing cap */
+  const mir=T=>T.map(([z,h])=>[-z,h]),fr=(T,col,closed)=>poly(T.map(([z,h])=>pf(z,h,.02)),col,closed);
+  fr([...mir(N7CONE).reverse(),...N7CONE],mul(HB,1.2));fr([...mir(N7LIN).reverse(),...N7LIN],mul(HB,1.0));
+  {const [z0,h0,a,b]=N7OVI,o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push([z0+a*Math.cos(t),h0+b*Math.sin(t)]);}fr(o,mul(HB,1.0),true);}
+  /* windscreen: front-view outline placed where the cab hump reaches each (z, height); its corner panes wrap down the hump's sides */
+  poly(N7WIN.map(([z,h])=>{const d=dFor(z,h,2.2,8.5);return d===null?null:onS(d,z,.04);}),mul(HC,2.6),true);
+  const hr=z=>{const hs=[];for(let i=0;i<N7WIN.length;i++){const [z0,h0]=N7WIN[i],[z1,h1]=N7WIN[(i+1)%N7WIN.length];if((z-z0)*(z-z1)<=0&&z0!==z1)hs.push(h0+(z-z0)/(z1-z0)*(h1-h0));}return [Math.min(...hs),Math.max(...hs)];};
+  for(const zp of[-.46,.46]){const [h0,h1]=hr(zp),o=[];for(let k=0;k<=10;k++){const h=h0+(h1-h0)*k/10,d=dFor(zp,h,2.2,8.5);o.push(d===null?null:onS(d,zp,.05));}poly(o,mul(HC,1.7));}
+  {const o=[];for(let k=0;k<=24;k++){const z=-.8+1.6*k/24,h=hr(Math.max(-.77,Math.min(.77,z)))[1]+.05,d=dFor(z,h,2.2,9);o.push(d===null?null:onS(d,z,.06));}poly(o,mul(HB,1.6));}
+  poly([[-.3,2.47],[-.1,2.62],[.06,2.8]].map(([z,h])=>{const d=dFor(z,h,2.2,8);return d===null?null:onS(d,z,.07);}),mul(HB,.8));
+  {let p=null;for(let k=0;k<=12;k++){const q=onS(2.2*k/12,0,.02);if(p)S.add(p,q,mul(HB,1.1));p=q;}}}};}
 const M700N=buildModel(specN700('noz')),M700K=buildModel(specN700('kyu'));
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
-const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:new THREE.Vector3(.55,.75,1).multiplyScalar(2.2)},uScale:U.uScale,uMul:{value:1}},
- vertexShader:`uniform float uPix;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vec3 n=normalize(normalMatrix*normal);mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;}`,
- fragmentShader:`uniform vec3 uCol;uniform float uScale,uMul;void main(){gl_FragColor=vec4(uCol*uScale*uMul,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
+const HCUT={value:0};/* on board, the camera is inside a car: drop silhouette shells within this distance */
+const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:new THREE.Vector3(.55,.75,1).multiplyScalar(2.2)},uScale:U.uScale,uMul:{value:1},uCut:HCUT},
+ vertexShader:`uniform float uPix;varying float vD;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vD=length(mv.xyz);vec3 n=normalize(normalMatrix*normal);mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;}`,
+ fragmentShader:`uniform vec3 uCol;uniform float uScale,uMul,uCut;varying float vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*uMul,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
 const heroMat=lineMat({nofade:true}),trainMat=lineMat({nofade:true});
 const HCL=[27,25,25,25,25,25,25,27];
 const heroCars=HCL.map((L,c)=>{const nf=c===0,nr=c===7,geo=M500.carGeo(L,nf,nr),g=new THREE.Group();g.matrixAutoUpdate=false;
@@ -498,9 +532,9 @@ const NC=[.35,.85,1.0].map(v=>v*1.6),M4=new THREE.Matrix4(),A=[0,0,0],B=[0,0,0];
 const trainRoot=new THREE.Group();scene.add(trainRoot);const ORG=new THREE.Vector3();
 const instLineMat=new THREE.ShaderMaterial({uniforms:{uScale:U.uScale},vertexShader:`attribute vec3 col;attribute vec4 m0,m1,m2,m3;attribute float ik;uniform float uScale;varying vec3 vC;
 void main(){vec4 mv=modelViewMatrix*(mat4(m0,m1,m2,m3)*vec4(position,1.));gl_Position=projectionMatrix*mv;vC=col*ik*uScale;}`,fragmentShader:LF,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
-const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix,uCol:{value:new THREE.Vector3(.6,.82,1).multiplyScalar(1.9)},uScale:U.uScale},
- vertexShader:`attribute float ik;uniform float uPix;varying float vK;void main(){vec4 mv=modelViewMatrix*(instanceMatrix*vec4(position,1.));vec3 n=normalize(normalMatrix*(mat3(instanceMatrix)*normal));mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;vK=ik;}`,
- fragmentShader:`uniform vec3 uCol;uniform float uScale;varying float vK;void main(){gl_FragColor=vec4(uCol*uScale*vK,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
+const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix,uCol:{value:new THREE.Vector3(.6,.82,1).multiplyScalar(1.9)},uScale:U.uScale,uCut:HCUT},
+ vertexShader:`attribute float ik;uniform float uPix;varying float vK,vD;void main(){vec4 mv=modelViewMatrix*(instanceMatrix*vec4(position,1.));vD=length(mv.xyz);vec3 n=normalize(normalMatrix*(mat3(instanceMatrix)*normal));mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;vK=ik;}`,
+ fragmentShader:`uniform vec3 uCol;uniform float uScale,uCut;varying float vK,vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*vK,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
 const NMAX=160,NT={lines:{noz:{},kyu:{}},occ:{},hull:{}},CARGS={front:[27,true,false],mid:[25,false,false],rear:[27,false,true]},DYN=THREE.DynamicDrawUsage;
 for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
  const o=new THREE.InstancedMesh(g,occMat,NMAX);o.instanceMatrix.setUsage(DYN);o.count=0;o.frustumCulled=false;o.layers.set(1);trainRoot.add(o);NT.occ[t]={m:o,n:0};
@@ -511,7 +545,7 @@ for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
   for(const k of['m0','m1','m2','m3']){at[k]=new THREE.InstancedBufferAttribute(new Float32Array(NMAX*4),4).setUsage(DYN);ig.setAttribute(k,at[k]);}
   at.ik=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);ig.setAttribute('ik',at.ik);ig.instanceCount=0;
   const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}
-const N7X=27/2-1.15,N7p=M700N.prof(N7X,27,true,false),N7L=[M700N.topAt(N7p,.95,.05),.95];
+const N7X=27/2-1.1,N7L=[1.42,1.08];
 const DET2=3500*3500;let detailOK=true;
 function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.type==='nozomi'?'noz':'kyu'][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
  const rx=P.cx-ORG.x,ry=P.cy-ORG.y,rz=P.cz-ORG.z,i=Lt.n++,j=i*4,a=Lt.at;
@@ -572,7 +606,7 @@ function placeHero(st,dt){const head=st.s+hero.dir*hero.len/2;let acc=0;
  for(let c=0;c<8;c++){const L=hero.cl[c],cs=head-hero.dir*(acc+L/2);acc+=L+.6;const P=pose(hero,cs,c===0?HP0:PQ);
   const g=heroCars[c];g.matrix.set(P.fx,P.ux,P.sx,P.cx,P.fy,P.uy,P.sy,P.cy,P.fz,P.uz,P.sz,P.cz,0,0,0,1);g.matrixWorldNeedsUpdate=true;
   if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);}
- tf+=((HP0.tun?.22:1)-tf)*Math.min(1,dt*5);heroMat.uniforms.uMul.value=tf;hullMat.uniforms.uMul.value=tf;}
+ tf+=((HP0.tun?.22:1)*(mode==='board'&&FT===hero&&OB.view==='front'?.4:1)-tf)*Math.min(1,dt*5);heroMat.uniforms.uMul.value=tf;hullMat.uniforms.uMul.value=tf;}
 function dot(tr,st){if(np>=MAXP)return;at(st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
 
 /* ---------- post-processing: persistence, bloom, tone map ---------- */
@@ -675,21 +709,35 @@ function platCam(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,sc=PC[k]+sd*60,o=trk(sc),
  const fx=-sd*tx-sd*tz*.1,fz=-sd*tz+sd*tx*.1,a=Math.atan2(fz,fx)+PLAT_CAM.yaw,p=PLAT_CAM.pitch-.03;
  T.set(Q[0]+Math.cos(a)*Math.cos(p)*100,Q[1]+Math.sin(p)*100,Q[2]+Math.sin(a)*Math.cos(p)*100);
  cam.fov=PLAT_CAM.fov;cam.near=.2;cam.far=160000;ovf=0;U.uFadeNear.value=25000;U.uFadeFar.value=120000;}
-function updCam(now){if(mode==='cine')cineCam(now);else if(mode==='plat')platCam();else orbitCam(now);cam.lookAt(T);cam.updateProjectionMatrix();}
+/* on board the followed train: the driver's view from the cab, or a window seat on either side (third car); drag to look around */
+const OB={view:'front',yaw:0,pitch:0,fov:62},OBP={},OBV=[0,0,0];
+function carPose(tr,s,c,o){let acc=0;for(let i=0;i<c;i++)acc+=tr.cl[i]+.6;return pose(tr,s+tr.dir*(tr.len/2-acc-tr.cl[c]/2),o);}
+function boardCam(){const tr=FT,v=OB.view,n500=!!tr.hero;let P,lx,ly,lz,dx,dy,dz;
+ if(v==='front'){P=FP0;lx=tr.cl[0]/2-(n500?6.4:5.7);ly=n500?2.6:2.72;lz=n500?-.3:-.35;dx=1;dy=-.035;dz=0;}
+ else{const sd=v==='right'?1:-1;P=carPose(tr,fs.s,Math.min(2,tr.cl.length-1),OBP);lx=.53;ly=2.42;lz=sd*1.25;dx=.18;dy=-.04;dz=sd;}
+ const cy=Math.cos(OB.yaw),sy=Math.sin(OB.yaw);let ax=dx*cy-dz*sy,az=dx*sy+dz*cy,ay=dy+OB.pitch;
+ const wx=P.cx+lx*P.fx+ly*P.ux+lz*P.sx,wy=P.cy+lx*P.fy+ly*P.uy+lz*P.sy,wz=P.cz+lx*P.fz+ly*P.uz+lz*P.sz;cam.position.set(wx,wy,wz);
+ T.set(wx+(ax*P.fx+ay*P.ux+az*P.sx)*100,wy+(ax*P.fy+ay*P.uy+az*P.sy)*100,wz+(ax*P.fz+ay*P.uz+az*P.sz)*100);cam.up.set(P.ux,P.uy,P.uz);
+ cam.fov=OB.fov;cam.near=.12;cam.far=160000;ovf=0;U.uFadeNear.value=25000;U.uFadeFar.value=120000;}
+function updCam(now){HCUT.value=mode==='board'?(OB.view==='front'?14:20):0;if(mode!=='board')cam.up.set(0,1,0);
+ if(mode==='cine')cineCam(now);else if(mode==='plat')platCam();else if(mode==='board')boardCam();else orbitCam(now);cam.lookAt(T);cam.updateProjectionMatrix();}
 
 const ptrs=new Map();let pinch=0;
 const clampPitch=p=>Math.min(1.45,Math.max(lerp(-.05,.15,ss(2000,100000,ORB.dist)),p));
 canvas.addEventListener('pointerdown',e=>{try{canvas.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch=Math.hypot(a[0]-b[0],a[1]-b[1]);}});
-canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;if(mode==='plat'){if(ptrs.size===1){PLAT_CAM.yaw-=dx*.004;PLAT_CAM.pitch=Math.min(.6,Math.max(-.6,PLAT_CAM.pitch+dy*.003));}else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*pinch/d));pinch=d;}return;}
+canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;if(mode==='board'){if(ptrs.size===1){OB.yaw=Math.min(1.4,Math.max(-1.4,OB.yaw+dx*.004));OB.pitch=Math.min(.6,Math.max(-.5,OB.pitch-dy*.003));}else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)OB.fov=Math.min(80,Math.max(20,OB.fov*pinch/d));pinch=d;}return;}if(mode==='plat'){if(ptrs.size===1){PLAT_CAM.yaw-=dx*.004;PLAT_CAM.pitch=Math.min(.6,Math.max(-.6,PLAT_CAM.pitch+dy*.003));}else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*pinch/d));pinch=d;}return;}
  if(mode!=='orbit')return;anim=null;
  if(ptrs.size===1){ORB.yaw+=dx*.006;ORB.pitch=clampPitch(ORB.pitch+dy*.005);}
  else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0){ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*pinch/d));ORB.pitch=clampPitch(ORB.pitch);}pinch=d;}});
 const up=e=>{ptrs.delete(e.pointerId);pinch=0;};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='plat'){PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*Math.exp(e.deltaY*.0012)));return;}if(mode!=='orbit')return;anim=null;ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*Math.exp(e.deltaY*.0012)));ORB.pitch=clampPitch(ORB.pitch);},{passive:false});
-function setMode(m){if(m==='plat'){if(mode!=='plat'){const ne=FT.ev[Math.min(fs.i+1,FT.ev.length-1)];setPlat(fs.stop>=0?fs.stop:ne.k,1);}mode='plat';anim=null;$('#shot').textContent='';}
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='board'){OB.fov=Math.min(80,Math.max(20,OB.fov*Math.exp(e.deltaY*.0012)));return;}if(mode==='plat'){PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*Math.exp(e.deltaY*.0012)));return;}if(mode!=='orbit')return;anim=null;ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*Math.exp(e.deltaY*.0012)));ORB.pitch=clampPitch(ORB.pitch);},{passive:false});
+function setMode(m){if(m==='board'){mode='board';anim=null;$('#shot').textContent='';setOB(OB.view);}
+ else if(m==='plat'){if(mode!=='plat'){const ne=FT.ev[Math.min(fs.i+1,FT.ev.length-1)];setPlat(fs.stop>=0?fs.stop:ne.k,1);}mode='plat';anim=null;$('#shot').textContent='';}
  else if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
  else{const b=PRESET[m]();if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m);});
+function setOB(v){OB.view=v;OB.yaw=0;OB.pitch=0;clearP=true;for(const b of document.querySelectorAll('#obUi button'))b.classList.toggle('on',b.dataset.v===v);}
+$('#obUi').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setOB(b.dataset.v);});
 function setPlat(k,side){PLAT_CAM.k=k;PLAT_CAM.side=side;PLAT_CAM.yaw=0;PLAT_CAM.pitch=0;$('#plat').value=String(k);$('#platSide').textContent=side>0?'下り Hakata-bound':'上り Shin-Osaka-bound';clearP=true;boardT=0;}
 {const sel=$('#plat');stations.forEach((s,k)=>{const o=document.createElement('option');o.value=String(k);o.textContent=`${s.ja} ${s.name}`;sel.appendChild(o);});
  sel.addEventListener('change',()=>setPlat(+sel.value,PLAT_CAM.side));$('#platSide').addEventListener('click',()=>setPlat(PLAT_CAM.k,-PLAT_CAM.side));}
@@ -707,7 +755,7 @@ function updBoard(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,rows=[];
   tb.appendChild(tr_);}
  if(!rows.length){const tr_=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;td.className='k';td.textContent='No trains in the next 90 minutes';tr_.appendChild(td);tb.appendChild(tr_);}}
 let modeShown='',legendShown=null;
-function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':ORB.dist<30000?'chase':'over';if(cur!==modeShown){modeShown=cur;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===cur);const pl=cur==='plat';$('#platUi').hidden=!pl;$('#trainWrap').hidden=pl;$('#board').hidden=!pl;$('#hero').hidden=pl;}
+function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode==='board'?'board':ORB.dist<30000?'chase':'over';if(cur!==modeShown){modeShown=cur;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===cur);const pl=cur==='plat';$('#obUi').hidden=cur!=='board';$('#platUi').hidden=!pl;$('#trainWrap').hidden=pl;$('#board').hidden=!pl;$('#hero').hidden=pl;}
  if(mode==='plat'&&performance.now()-boardT>500){boardT=performance.now();updBoard();}
  if(mode!=='plat'&&performance.now()-selT>2000){selT=performance.now();updTrainSel();}
  const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
@@ -749,7 +797,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  if(FT!==hero){const st=stateAt(FT,simT,FSX);if(!st)setFocus(hero);else{fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(FT,st.s+FT.dir*(FT.len/2-FT.cl[0]/2),FP0);}}
  dG.setDrawRange(0,nv);dG.attributes.position.needsUpdate=true;dG.attributes.col.needsUpdate=true;io.count=ni;io.instanceMatrix.needsUpdate=true;
  pG.setDrawRange(0,np);for(const k of['position','col','sz','kind'])pG.attributes[k].needsUpdate=true;
- updCam(now);updModeUi();liveUpdate(now);if(ovf<.9)patch(HP0.cx,HP0.cz);
+ updCam(now);updModeUi();liveUpdate(now);if(ovf<.9)patch(FP0.cx,FP0.cz);
  hullMat.uniforms.uPix.value=1.5*DPR*2*Math.tan(cam.fov*Math.PI/360)/BH;
  renderer.setRenderTarget(rtMain);renderer.clear(true,true,false);cam.layers.enable(0);cam.layers.enable(1);renderer.render(scene,cam);
  renderer.setRenderTarget(rtTrain);renderer.clear(true,true,false);cam.layers.set(1);renderer.render(scene,cam);cam.layers.enable(0);
