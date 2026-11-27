@@ -55,6 +55,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 #note{position:relative;flex-basis:100%;margin:0;font-size:11px;line-height:1.4;color:var(--dim);text-shadow:0 0 4px #000;display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}#note a{color:var(--ink)}#about summary{cursor:pointer;color:var(--ink);list-style:none;padding:4px 2px}#about summary::-webkit-details-marker{display:none}#about .body{position:absolute;left:0;bottom:calc(100% + 4px);width:min(560px,calc(100vw - 20px));padding:8px 10px;background:rgba(0,8,16,.92);border:1px solid var(--line);border-radius:6px;color:var(--ink);text-shadow:none;z-index:3}
 /* camera and time: segmented buttons on wide screens; an icon that opens a menu on phones */
 .grp{position:relative;display:flex}.grp .ico{display:none;appearance:none;align-items:center;justify-content:center;gap:6px;min-height:42px;min-width:46px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65);color:var(--ink);font:inherit;cursor:pointer}.grp .ico svg{width:20px;height:20px;flex:none}.grp.open .ico{background:rgba(92,200,255,.24);color:#fff}
+#hud,#ui{transition:opacity .9s ease}body.calm #hud,body.calm #ui{opacity:0;pointer-events:none}body.calm #c{cursor:none}
 #msg{position:fixed;inset:0;display:grid;place-items:center;color:var(--dim);font-size:15px;pointer-events:none;padding:20px;text-align:center}
 @media(max-width:600px){.grp .ico{display:inline-flex}.grp>.seg{display:none;position:absolute;left:0;bottom:calc(100% + 6px);flex-direction:column;z-index:3;background:rgba(0,8,16,.92);min-width:150px}.grp.open>.seg{display:flex}.grp>.seg button{border-right:0;border-bottom:1px solid var(--line);text-align:left}.grp>.seg button:last-child{border-bottom:0}
  #camGrp{order:1}#timeGrp{order:2}#layers{order:3}#trainWrap,#obUi,#platUi{order:4}#note{order:5}#trainWrap{flex-basis:100%}#trainSel{max-width:100%;width:100%}
@@ -80,7 +81,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
   <div class="grp" id="timeGrp"><button class="ico" aria-label="Time speed" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg><span class="cur"></span></button><div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div></div>
-  <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><hr></div></details>
+  <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><label><input type="checkbox" id="calm"><span>集中 Distraction-free</span></label><hr></div></details>
       <div id="note"><span id="credit" hidden>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span> <details id="about"><summary>ⓘ About</summary><span class="body"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.<br><span id="credFull">Map data © OpenStreetMap contributors.</span></span></details></div>
 </div>
 <div id="msg">Building scene…</div>
@@ -174,6 +175,7 @@ function trk(s){s=s<0?0:s>LEN-1e-3?LEN-1e-3:s;const f=s/DS;let i=f|0;if(i>=N)i=N
  const tx=TX[i]+(TX[i+1]-TX[i])*u,tz=TZ[i]+(TZ[i+1]-TZ[i])*u,l=Math.hypot(tx,tz)||1;o.tx=tx/l;o.tz=tz/l;o.i=u<.5?i:i+1;return o;}
 function at(s,off,out){const o=trk(s);out[0]=o.x+o.tz*off;out[1]=o.y;out[2]=o.z-o.tx*off;return out;}
 const sp=(i,off)=>[PX[i]+TZ[i]*off,PY[i],PZ[i]-TX[i]*off];
+function tunAt(s){const f=Math.min(Math.max(s,0),LEN-1e-3)/DS,i=Math.min(N-1,f|0),u=f-i;return TUN[i]+(TUN[i+1]-TUN[i])*u;}
 function loopAmt(d){if(d<230)return 1;if(d<600){const t=1-(d-230)/370;return t*t*(3-2*t);}return 0;}
 function nearestK(s){let b=0,bd=1e30;for(let k=0;k<NS;k++){const d=Math.abs(s-PC[k]);if(d<bd){bd=d;b=k;}}return b;}
 
@@ -536,7 +538,8 @@ const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:
 const heroMat=lineMat({nofade:true}),trainMat=lineMat({nofade:true});
 const HCL=[27,25,25,25,25,25,25,27];
 const heroCars=HCL.map((L,c)=>{const nf=c===0,nr=c===7,geo=M500.carGeo(L,nf,nr),g=new THREE.Group();g.matrixAutoUpdate=false;
- const o=new THREE.Mesh(geo,occMat),h=new THREE.Mesh(geo,hullMat),l=M500.carLines(L,nf,nr,c===2?5:c===5?-5:null).mesh(heroMat,1);
+ const lm=lineMat({nofade:true}),hm=hullMat.clone();for(const k of['uPix','uCol','uScale','uCut'])hm.uniforms[k]=hullMat.uniforms[k];g.userData={lm,hm,k:1};
+ const o=new THREE.Mesh(geo,occMat),h=new THREE.Mesh(geo,hm),l=M500.carLines(L,nf,nr,c===2?5:c===5?-5:null).mesh(lm,1);
  o.layers.set(1);h.layers.set(1);o.frustumCulled=h.frustumCulled=false;g.add(o,h,l);scene.add(g);return g;});
 const HLX=27/2-1.0,HLq=M500.sec(-.25,M500.prof(HLX,27,true,false),.06),HL=[[HLX,HLq[1],Math.abs(HLq[0])*.8],[HLX,HLq[1],-Math.abs(HLq[0])*.8]];
 
@@ -612,13 +615,13 @@ for(let h=6;h<22;h++){const a=mkTrain('kodama',1,h===8);planKodama(a,h*3600+720,
 function latFor(tr,s){const k=nearestK(s);let off=2.15;if(tr.stopSet.has(k))off+=(tr.type==='kodama'&&stations[k].major?14:5)*loopAmt(Math.abs(s-PC[k]));return tr.dir*off;}
 function pose(tr,cs,o){const sf=cs+tr.dir*8.5,sr=cs-tr.dir*8.5;at(sf,latFor(tr,sf),A);at(sr,latFor(tr,sr),B);
  let fx=A[0]-B[0],fy=A[1]-B[1],fz=A[2]-B[2];const l=Math.hypot(fx,fy,fz)||1;fx/=l;fy/=l;fz/=l;let sx=-fz,sz=fx;const sl=Math.hypot(sx,sz)||1;sx/=sl;sz/=sl;
- o.fx=fx;o.fy=fy;o.fz=fz;o.sx=sx;o.sy=0;o.sz=sz;o.ux=-sz*fy;o.uy=sz*fx-sx*fz;o.uz=sx*fy;o.cx=(A[0]+B[0])/2;o.cy=(A[1]+B[1])/2;o.cz=(A[2]+B[2])/2;o.tun=TUN[trk(cs).i];return o;}
+ o.fx=fx;o.fy=fy;o.fz=fz;o.sx=sx;o.sy=0;o.sz=sz;o.ux=-sz*fy;o.uy=sz*fx-sx*fz;o.uz=sx*fy;o.cx=(A[0]+B[0])/2;o.cy=(A[1]+B[1])/2;o.cz=(A[2]+B[2])/2;o.tun=tunAt(cs);return o;}
 function light(P,x,y,z,c,size){if(np>=MAXP)return;const i=np*3;PP[i]=P.cx+x*P.fx+y*P.ux+z*P.sx;PP[i+1]=P.cy+x*P.fy+y*P.uy+z*P.sy;PP[i+2]=P.cz+x*P.fz+y*P.uz+z*P.sz;PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=size;PK[np]=0;np++;}
 function wv(q,P,k){const i=nv*3;DP[i]=P.cx+q[0]*P.fx+q[1]*P.ux+q[2]*P.sx;DP[i+1]=P.cy+q[0]*P.fy+q[1]*P.uy+q[2]*P.sy;DP[i+2]=P.cz+q[0]*P.fz+q[1]*P.uz+q[2]*P.sz;DC[i]=NC[0]*k;DC[i+1]=NC[1]*k;DC[i+2]=NC[2]*k;nv++;}
 const PQ={},HP0={fx:1,fy:0,fz:0,ux:0,uy:1,uz:0,sx:0,sy:0,sz:1,cx:0,cy:0,cz:0,tun:0};
 const FULL=[.6,3.6,1.68],TIP=[.95,1.45,.3];
 function drawN700(tr,st){const head=st.s+tr.dir*tr.len/2,n=tr.cl.length;let acc=0;
- for(let c=0;c<n;c++){const L=tr.cl[c],cs=head-tr.dir*(acc+L/2);acc+=L+.6;const P=pose(tr,cs,PQ),h=L/2,k=P.tun?.22:1;
+ for(let c=0;c<n;c++){const L=tr.cl[c],cs=head-tr.dir*(acc+L/2);acc+=L+.6;const P=pose(tr,cs,PQ),h=L/2,k=1-.78*P.tun;
   if(detailOK&&(P.cx-ORG.x)**2+(P.cy-ORG.y)**2+(P.cz-ORG.z)**2<DET2&&addDetailed(tr,c,n,P,k)){if(c===0)for(const z of[-N7L[1],N7L[1]])light(P,N7X,N7L[0],z,[5,5,4.6],4);if(c===n-1)for(const z of[-N7L[1],N7L[1]])light(P,-N7X,N7L[0],z,[4,.2,.1],3.5);continue;}
   if(nv+44>MAXV||ni>=MAXI)return;
   const secs=c===0?[[-h,FULL],[h-9,FULL],[h,TIP]]:c===n-1?[[-h,TIP],[-h+9,FULL],[h,FULL]]:[[-h,FULL],[h,FULL]];let prev=null;
@@ -631,8 +634,9 @@ let tf=1;
 function placeHero(st,dt){const head=st.s+hero.dir*hero.len/2;let acc=0;
  for(let c=0;c<8;c++){const L=hero.cl[c],cs=head-hero.dir*(acc+L/2);acc+=L+.6;const P=pose(hero,cs,c===0?HP0:PQ);
   const g=heroCars[c];g.matrix.set(P.fx,P.ux,P.sx,P.cx,P.fy,P.uy,P.sy,P.cy,P.fz,P.uz,P.sz,P.cz,0,0,0,1);g.matrixWorldNeedsUpdate=true;
-  if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);}
- tf+=((HP0.tun?.22:1)*(mode==='board'&&FT===hero&&OB.view==='front'?.4:1)-tf)*Math.min(1,dt*5);heroMat.uniforms.uMul.value=tf;hullMat.uniforms.uMul.value=tf;}
+  if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);
+  /* each car dims on its own as it passes a portal, eased over a few frames */
+  const u=g.userData,tg=(1-.78*P.tun)*(mode==='board'&&FT===hero&&OB.view==='front'?.4:1);u.k+=(tg-u.k)*Math.min(1,dt*8);u.lm.uniforms.uMul.value=u.k;u.hm.uniforms.uMul.value=u.k;}}
 function dot(tr,st){if(np>=MAXP)return;at(st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
 
 /* the followed train's own rails light up from its outermost wheels, forward (white) and back (red), fading over about a car length */
@@ -862,6 +866,11 @@ window.addEventListener('resize',resize);
  for(const [k,L] of items){const lab=document.createElement('label'),cb=document.createElement('input'),sw=document.createElement('i'),tx=document.createElement('span');
   cb.type='checkbox';cb.checked=saved[k]!==false;cb.addEventListener('change',()=>{apply(k,cb.checked);saved[k]=cb.checked;try{localStorage.setItem('shinkaviz-layers',JSON.stringify(saved));}catch(e){}});
   const c=L.c.map(v=>Math.round(Math.min(1,v*1.4)*255));sw.style.background=`rgb(${c})`;tx.textContent=`${L.ja} ${L.en}`;lab.append(cb,sw,tx);box.appendChild(lab);apply(k,cb.checked);}}
+/* distraction-free: after 3 s without input the panels and controls fade away; any touch, click, mouse move or key brings them back */
+{const cb=$('#calm');let on=false,tm=0;try{on=localStorage.getItem('shinkaviz-calm')==='1';}catch(e){}cb.checked=on;
+ const arm=()=>{clearTimeout(tm);document.body.classList.remove('calm');if(on)tm=setTimeout(()=>{if(!document.querySelector('#layers[open]'))document.body.classList.add('calm');else arm();},3000);};
+ cb.addEventListener('change',()=>{on=cb.checked;try{localStorage.setItem('shinkaviz-calm',on?'1':'0');}catch(e){}$('#layers').open=false;arm();});
+ for(const ev of['pointermove','pointerdown','wheel','keydown','touchstart'])window.addEventListener(ev,arm,{passive:true});arm();}
 $('#src').textContent=SRC_NOTE;$('#procNote').hidden=!!LIVE;$('#liveNote').hidden=!LIVE;$('#credit').hidden=!LINE;if(LIVE)$('#credFull').textContent='Map data © OpenStreetMap contributors. Vector tiles: OpenFreeMap © OpenMapTiles. Terrain: Terrain Tiles (Mapzen, AWS Open Data).';resize();msg.remove();requestAnimationFrame(frame);
 }
 }
