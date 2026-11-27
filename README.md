@@ -9,11 +9,12 @@ The current test case is the **500 series** on the Sanyo Shinkansen (Shin-Osaka 
 `index.html` is a self-contained prototype (three.js r128 from cdnjs). Open it in a browser.
 
 What is real so far:
+- Track alignment, tunnels (51%) and viaducts (36%) from OpenStreetMap, 553.5 km Shin-Osaka – Hakata
 - Station locations and names (Japanese and English)
 - Approximate 500 series proportions: 8 cars, 15 m nose, near-circular body, livery stripes
 
 What is placeholder:
-- **Track alignment:** a smooth curve through the station coordinates. To be replaced by OpenStreetMap data (see below).
+- **Track layout at stations:** passing loops and platforms are generic, not the real layouts.
 - **Terrain:** procedural noise. To be replaced by GSI DEM elevation tiles.
 - **Timetable:** an invented sample. A scheduling pass holds each Kodama at stations so faster trains overtake it there.
 - **500 series pantograph type and position:** unverified.
@@ -32,17 +33,21 @@ Controls: Chase / Trackside / Overview cameras, time speed 1×–300×, persiste
 
 ## Data pipeline
 
-`osm_sanyo.py` queries the Overpass API for Sanyo Shinkansen track ways (with tunnel and bridge flags) and stations. It writes `sanyo.json`, which holds the ways, the stations, and a 50 m centreline ordered Shin-Osaka → Hakata. It is untested so far.
+1. `osm_sanyo.py` queries the Overpass API (it tries several mirrors) for Sanyo Shinkansen track ways with tunnel and bridge flags, plus the stations. It writes `sanyo.json`.
+2. `build_line.py` re-centres the rough centreline on the real running rails, resamples it to 50 m, flags each sample as tunnel or viaduct, and gives each station its distance along the line. It writes `data/sanyo-line.js`, which the page loads with a plain `<script>` tag so it also works when opened from disk.
 
 ```
 python3 osm_sanyo.py sanyo.json
+python3 build_line.py sanyo.json data/sanyo-line.js
 ```
 
-OpenStreetMap data is © OpenStreetMap contributors under the ODbL; the attribution must be shown wherever the data is displayed.
+If `data/sanyo-line.js` is missing, the page falls back to a smooth curve through the stations.
+
+OpenStreetMap data is © OpenStreetMap contributors under the ODbL; the page shows that credit.
 
 ## Plan
 
-1. Replace the placeholder track with the OSM centreline and tunnel/bridge flags.
+1. ~~Replace the placeholder track with the OSM centreline and tunnel/bridge flags.~~ Done.
 2. Scrape the real Sanyo timetable, including which trains run as 500 series (before January 2027).
 3. Replace the terrain with GSI DEM contours and coastlines.
 4. Draw persistence trails as world-space lines, so orbiting doesn't smear.

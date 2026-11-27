@@ -38,7 +38,7 @@ body{font:14px/1.35 "Chakra Petch","Noto Sans JP",system-ui,sans-serif}
 .seg button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 label.sl{display:flex;align-items:center;gap:8px;color:var(--dim);background:rgba(0,10,20,.65);border:1px solid var(--line);border-radius:6px;padding:0 10px;min-height:42px}
 input[type=range]{width:110px;accent-color:var(--acc)}
-#note{flex-basis:100%;margin:0;font-size:12px;color:var(--dim);text-shadow:0 0 4px #000}
+#note{flex-basis:100%;margin:0;font-size:12px;color:var(--dim);text-shadow:0 0 4px #000}#note a{color:var(--ink)}
 #msg{position:fixed;inset:0;display:grid;place-items:center;color:var(--dim);font-size:15px;pointer-events:none;padding:20px;text-align:center}
 @media(max-width:600px){#clock{font-size:20px}#hero{font-size:12px}#hero h1{font-size:13px}input[type=range]{width:72px}.seg button{padding:0 9px}label.sl{padding:0 8px;font-size:13px}}
 </style>
@@ -60,10 +60,11 @@ input[type=range]{width:110px;accent-color:var(--acc)}
   <div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div>
   <label class="sl">Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label>
   <label class="sl">Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label>
-  <p id="note">Look test, not real data yet: track is smoothed through real station locations, terrain is procedural, and the timetable is an invented sample. 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.</p>
+  <p id="note"><span id="src"></span> Terrain is procedural and the timetable is an invented sample. 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom. <span id="credit" hidden>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</span></p>
 </div>
 <div id="msg">Building scene…</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="data/sanyo-line.js"></script>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -87,14 +88,16 @@ const STN=[["Shin-Osaka",34.7334,135.5002,1,"新大阪"],["Shin-Kobe",34.7066,13
 const LAT0=34.2,LON0=133.0,KX=111320*Math.cos(LAT0*Math.PI/180),KZ=110574;
 const stations=STN.map(([name,lat,lon,major,ja])=>({name,ja,major:!!major,x:(lon-LON0)*KX,z:-(lat-LAT0)*KZ}));
 const NS=stations.length;
-const curve=new THREE.CatmullRomCurve3(stations.map(s=>new THREE.Vector3(s.x,0,s.z)),false,'centripetal');
-curve.arcLengthDivisions=40000;
-const LEN=curve.getLength(),N=Math.round(LEN/50),DS=LEN/N;
-const raw=curve.getSpacedPoints(N);
-const PX=new Float64Array(N+1),PZ=new Float64Array(N+1),PY=new Float64Array(N+1),TX=new Float64Array(N+1),TZ=new Float64Array(N+1),TUN=new Uint8Array(N+1);
-for(let i=0;i<=N;i++){PX[i]=raw[i].x;PZ[i]=raw[i].z;}
+/* Track: OpenStreetMap centreline from data/sanyo-line.js (build_line.py); falls back to a curve through the stations. */
+const LINE=window.SANYO_LINE&&window.SANYO_LINE.origin[0]===LAT0&&window.SANYO_LINE.origin[1]===LON0&&STN.every(r=>window.SANYO_LINE.stations.some(x=>x.ja===r[4]))?window.SANYO_LINE:null;
+let N,DS,LEN,SRC_X,SRC_Z;
+if(LINE){N=LINE.xz.length/2-1;DS=LINE.step;LEN=N*DS;SRC_X=i=>LINE.xz[2*i];SRC_Z=i=>LINE.xz[2*i+1];}
+else{const curve=new THREE.CatmullRomCurve3(stations.map(s=>new THREE.Vector3(s.x,0,s.z)),false,'centripetal');curve.arcLengthDivisions=40000;LEN=curve.getLength();N=Math.round(LEN/50);DS=LEN/N;const raw=curve.getSpacedPoints(N);SRC_X=i=>raw[i].x;SRC_Z=i=>raw[i].z;}
+const PX=new Float64Array(N+1),PZ=new Float64Array(N+1),PY=new Float64Array(N+1),TX=new Float64Array(N+1),TZ=new Float64Array(N+1),TUN=new Uint8Array(N+1),BRG=new Uint8Array(N+1);
+for(let i=0;i<=N;i++){PX[i]=SRC_X(i);PZ[i]=SRC_Z(i);}
 for(let i=0;i<=N;i++){const a=Math.max(0,i-1),b=Math.min(N,i+1);const tx=PX[b]-PX[a],tz=PZ[b]-PZ[a],l=Math.hypot(tx,tz)||1;TX[i]=tx/l;TZ[i]=tz/l;}
-const SC=stations.map(s=>{let b=0,bd=1e30;for(let i=0;i<=N;i++){const d=(PX[i]-s.x)*(PX[i]-s.x)+(PZ[i]-s.z)*(PZ[i]-s.z);if(d<bd){bd=d;b=i;}}return b*DS;});
+const SC=LINE?stations.map(s=>LINE.stations.find(x=>x.ja===s.ja).s):stations.map(s=>{let b=0,bd=1e30;for(let i=0;i<=N;i++){const d=(PX[i]-s.x)*(PX[i]-s.x)+(PZ[i]-s.z)*(PZ[i]-s.z);if(d<bd){bd=d;b=i;}}return b*DS;});
+if(LINE)stations.forEach((s,k)=>{const i=Math.min(N,Math.round(SC[k]/DS));s.x=PX[i];s.z=PZ[i];});
 const PC=SC.map(s=>Math.min(Math.max(s,260),LEN-260));
 
 /* ---------- procedural terrain (placeholder for GSI DEM) ---------- */
@@ -106,8 +109,9 @@ function zAt(x){if(x<=SXZ[0][0])return SXZ[0][1];for(let i=1;i<SXZ.length;i++)if
 function Hx(x,z,zt){const n=(zt-z)/1000;let h=110+7*n+(fbm(x/21000+3.7,z/21000+9.1)-.47)*640;if(n<-2.5)h-=(-n-2.5)*28;return h;}
 const hs=new Float64Array(N+1);for(let i=0;i<=N;i++)hs[i]=Hx(PX[i],PZ[i],zAt(PX[i]));
 {const W=60,pre=new Float64Array(N+2);for(let i=0;i<=N;i++)pre[i+1]=pre[i]+hs[i];
- for(let i=0;i<=N;i++){const a=Math.max(0,i-W),b=Math.min(N,i+W);PY[i]=Math.max((pre[b+1]-pre[a])/(b-a+1),4)+9;TUN[i]=hs[i]>PY[i]+4?1:0;}
- for(let k=0;k<NS;k++){const c=Math.round(PC[k]/DS);for(let i=Math.max(0,c-16);i<=Math.min(N,c+16);i++)TUN[i]=0;}}
+ for(let i=0;i<=N;i++){const a=Math.max(0,i-W),b=Math.min(N,i+W);PY[i]=Math.max((pre[b+1]-pre[a])/(b-a+1),4)+9;}
+ if(LINE)for(let i=0;i<=N;i++){const f=LINE.flags[i];TUN[i]=f==='1'?1:0;BRG[i]=f==='2'?1:0;}
+ else{for(let i=0;i<=N;i++)TUN[i]=hs[i]>PY[i]+4?1:0;for(let k=0;k<NS;k++){const c=Math.round(PC[k]/DS);for(let i=Math.max(0,c-16);i<=Math.min(N,c+16);i++)TUN[i]=0;}}}
 
 /* ---------- track helpers ---------- */
 const TP={x:0,y:0,z:0,tx:1,tz:0,i:0};
@@ -159,7 +163,16 @@ const CX=(minX+maxX)/2,CZ=(minZ+maxZ)/2;
    const k=(a>L?1:0)|(b>L?2:0)|(c>L?4:0)|(d>L?8:0);if(k===0||k===15)continue;const X=x0+i*G,Z=z0+j*G;
    const e=n=>n===0?[X+(L-a)/(b-a)*G,L,Z]:n===1?[X+G,L,Z+(L-b)/(c-b)*G]:n===2?[X+(L-d)/(c-d)*G,L,Z+G]:[X,L,Z+(L-a)/(d-a)*G];
    const m=MS[k];for(let q=0;q<m.length;q+=2)sC.add(e(m[q]),e(m[q+1]),col);}}}
+/* viaducts (OSM bridge flags) and tunnel portals */
+const DECK=[.06,.22,.36],PIER=[.04,.15,.26],PORT=[.3,.7,1.0];
+for(const dr of[1,-1])for(const [o,dy] of[[5.6,-.3],[5.6,1.3]]){let p=null;for(let i=0;i<=N;i++){if(!BRG[i]){p=null;continue;}const q=sp(i,dr*o);q[1]+=dy;if(p)sW.add(p,q,DECK);p=q;}}
+for(let i=0;i<=N;i++){if(!BRG[i]||TUN[i])continue;const g=Math.max(hs[i],0),top=PY[i]-1.2;if(top-g<3)continue;
+ const l=sp(i,-5.6),r=sp(i,5.6);l[1]=r[1]=top;sW.add(l,r,PIER);for(const o of[-2.6,2.6]){const a=sp(i,o);a[1]=top;sW.add(a,[a[0],g,a[2]],PIER);}}
+for(let i=1;i<=N;i++){if(TUN[i]===TUN[i-1])continue;const j=TUN[i]?i:i-1;let p=null;
+ for(let k=0;k<=24;k++){const t=k/24;let u,v;if(t<.2){u=-4.8;v=t/.2*3.5;}else if(t>.8){u=4.8;v=(1-t)/.2*3.5;}else{const an=Math.PI*(1-(t-.2)/.6);u=4.8*Math.cos(an);v=3.5+4.8*Math.sin(an);}
+  const q=sp(j,u);q[1]+=v-.5;if(p)sS.add(p,q,mul(PORT,1.2));p=q;}}
 scene.add(sC.mesh(contourMat),sT.mesh(trackMat),sW.mesh(wireMat),sS.mesh(stationMat));
+const SRC_NOTE=LINE?'Track alignment, tunnels and viaducts from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
 
 /* near terrain grid around the camera target */
 const NPn=61,NPs=100,NPh=(NPn-1)/2*NPs,npSegs=2*NPn*(NPn-1),npPos=new Float32Array(npSegs*6),npCol=new Float32Array(npSegs*6),npH=new Float32Array(NPn*NPn);
@@ -370,7 +383,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  const fu=mFinal.uniforms;fu.tMain.value=rtMain.texture;fu.tP.value=cur.texture;fu.b1.value=lv[0].a.texture;fu.b2.value=lv[1].a.texture;fu.b3.value=lv[2].a.texture;fu.b4.value=lv[3].a.texture;fu.b5.value=lv[4].a.texture;fu.uGlow.value=+glow.value;pass(mFinal,null);
  updLabels();if(now-hudT>120){hudT=now;updHud();}}
 window.addEventListener('resize',resize);
-resize();setMode('chase');msg.remove();requestAnimationFrame(frame);
+$('#src').textContent=SRC_NOTE;$('#credit').hidden=!LINE;resize();setMode('chase');msg.remove();requestAnimationFrame(frame);
 }
 }
 </script>
