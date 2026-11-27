@@ -47,9 +47,13 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 #layerList{position:absolute;bottom:50px;left:0;z-index:2;display:grid;gap:2px;padding:8px 10px;min-width:220px;background:rgba(0,8,16,.92);border:1px solid var(--line);border-radius:6px}
 #layerList label{display:flex;align-items:center;gap:10px;min-height:36px;cursor:pointer;white-space:nowrap}
 #layerList input{width:18px;height:18px;flex:none;accent-color:var(--acc)}#layerList .sl2{justify-content:space-between}#layerList .sl2 input{width:110px;height:auto}#layerList hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}#shot{font-size:12px;color:var(--acc);margin-top:2px}#shot:empty{display:none}#layerList i{width:16px;height:3px;border-radius:2px;flex:none}
-#note{flex-basis:100%;margin:0;font-size:11px;line-height:1.4;color:var(--dim);text-shadow:0 0 4px #000}#note a{color:var(--ink)}#about{display:inline}#about summary{display:inline;cursor:pointer;color:var(--ink);list-style:none;padding:4px 2px}#about summary::-webkit-details-marker{display:none}#about[open] .body{display:block;max-width:560px;margin-top:2px}
+#note{position:relative;flex-basis:100%;margin:0;font-size:11px;line-height:1.4;color:var(--dim);text-shadow:0 0 4px #000;display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}#note a{color:var(--ink)}#about summary{cursor:pointer;color:var(--ink);list-style:none;padding:4px 2px}#about summary::-webkit-details-marker{display:none}#about .body{position:absolute;left:0;bottom:calc(100% + 4px);width:min(560px,calc(100vw - 20px));padding:8px 10px;background:rgba(0,8,16,.92);border:1px solid var(--line);border-radius:6px;color:var(--ink);text-shadow:none;z-index:3}
+/* camera and time: segmented buttons on wide screens; an icon that opens a menu on phones */
+.grp{position:relative;display:flex}.grp .ico{display:none;appearance:none;align-items:center;justify-content:center;gap:6px;min-height:42px;min-width:46px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65);color:var(--ink);font:inherit;cursor:pointer}.grp .ico svg{width:20px;height:20px;flex:none}.grp.open .ico{background:rgba(92,200,255,.24);color:#fff}
 #msg{position:fixed;inset:0;display:grid;place-items:center;color:var(--dim);font-size:15px;pointer-events:none;padding:20px;text-align:center}
-@media(max-width:600px){#clock{font-size:20px}#hero{font-size:12px}#hero h1{font-size:13px}input[type=range]{width:72px}.seg button{padding:0 9px}label.sl{padding:0 8px;font-size:13px}}
+@media(max-width:600px){.grp .ico{display:inline-flex}.grp>.seg{display:none;position:absolute;left:0;bottom:calc(100% + 6px);flex-direction:column;z-index:3;background:rgba(0,8,16,.92);min-width:150px}.grp.open>.seg{display:flex}.grp>.seg button{border-right:0;border-bottom:1px solid var(--line);text-align:left}.grp>.seg button:last-child{border-bottom:0}
+ #camGrp{order:1}#timeGrp{order:2}#layers{order:3}#trainWrap,#obUi,#platUi{order:4}#note{order:5}#trainWrap{flex-basis:100%}#trainSel{max-width:100%;width:100%}
+ #clock{font-size:20px}#hero{font-size:12px}#hero h1{font-size:13px}input[type=range]{width:72px}.seg button{padding:0 9px}label.sl{padding:0 8px;font-size:13px}}
 </style>
 </head>
 <body>
@@ -66,13 +70,13 @@ input[type=range]{width:110px;accent-color:var(--acc)}
     <span class="k">位置 Position</span><span class="v" id="km"></span></div></div>
 </div>
 <div id="ui">
-  <div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="plat">Platform</button><button data-m="board">On board</button></div>
+  <div class="grp" id="camGrp"><button class="ico" aria-label="Camera" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.6"/></svg><span class="cur"></span></button><div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="plat">Platform</button><button data-m="board">On board</button></div></div>
   <span id="obUi" class="seg" hidden><button data-v="front" class="on">前面 Cab</button><button data-v="left">左 Left</button><button data-v="right">右 Right</button></span>
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
-  <div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div>
+  <div class="grp" id="timeGrp"><button class="ico" aria-label="Time speed" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg><span class="cur"></span></button><div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div></div>
   <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><hr></div></details>
-      <p id="note"><span id="credit" hidden>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors<span id="credX"></span></span> <details id="about"><summary>ⓘ About</summary><span class="body"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.</span></details></p>
+      <div id="note"><span id="credit" hidden>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors<span id="credX"></span></span> <details id="about"><summary>ⓘ About</summary><span class="body"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.</span></details></div>
 </div>
 <div id="msg">Building scene…</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -771,6 +775,9 @@ function setMode(m){if(m==='board'){mode='board';anim=null;$('#shot').textConten
  else if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
  else{const b=PRESET[m]();if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m);});
+for(const g of document.querySelectorAll('.grp')){const ic=g.querySelector('.ico');ic.addEventListener('click',e=>{e.stopPropagation();const o=!g.classList.contains('open');for(const x of document.querySelectorAll('.grp'))x.classList.remove('open');g.classList.toggle('open',o);ic.setAttribute('aria-expanded',String(o));});
+ g.querySelector('.seg').addEventListener('click',e=>{if(e.target.closest('button')){g.classList.remove('open');ic.setAttribute('aria-expanded','false');}});}
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.grp'))for(const x of document.querySelectorAll('.grp'))x.classList.remove('open');});
 function setOB(v){OB.view=v;OB.yaw=0;OB.pitch=0;clearP=true;for(const b of document.querySelectorAll('#obUi button'))b.classList.toggle('on',b.dataset.v===v);}
 $('#obUi').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setOB(b.dataset.v);});
 function setPlat(k,side){PLAT_CAM.k=k;PLAT_CAM.side=side;PLAT_CAM.yaw=0;PLAT_CAM.pitch=0;$('#plat').value=String(k);$('#platSide').textContent=side>0?'下り Hakata-bound':'上り Shin-Osaka-bound';clearP=true;boardT=0;}
@@ -795,7 +802,7 @@ function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode===
  if(mode!=='plat'&&performance.now()-selT>2000){selT=performance.now();updTrainSel();}
  const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
  trackMat.uniforms.uMul.value=1-.7*ovf;wireMat.uniforms.uMul.value=1-.92*ovf;patchMat.uniforms.uMul.value=1-ovf;for(const L of Object.values(layerObjs))L.mat.uniforms.uMul.value=1-.4*ovf;for(const m of Object.values(LTM.mats))m.uniforms.uMul.value=1-.4*ovf;}
-$('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
+$('#timeGrp .cur').textContent='1×';$('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;$('#timeGrp .cur').textContent=b.textContent;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
 const pers=$('#pers'),glow=$('#glow');
 
 function setFocus(tr){if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
