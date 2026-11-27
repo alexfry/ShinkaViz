@@ -11,7 +11,7 @@ The current test case is the **500 series** on the Sanyo Shinkansen (Shin-Osaka 
 What is real so far:
 - Track alignment, tunnels (51%) and viaducts (36%) from OpenStreetMap, 553.5 km Shin-Osaka – Hakata
 - Station locations and names (Japanese and English)
-- Approximate 500 series proportions: 8 cars, 15 m conical nose with a raised teardrop canopy, near-circular body with a skirt down over the bogies, 17.5 m bogie centres, livery stripes
+- 500 series end-car shape fitted to a JR West V-set elevation drawing: nose plan and side profiles, canopy and glazing position, body section, livery band heights, door and bogie positions (tables in `index.html`)
 
 What is placeholder:
 - **Track layout at stations:** passing loops and platforms are generic, not the real layouts.

@@ -206,16 +206,24 @@ function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs;if(M
  npG.attributes.position.needsUpdate=true;npG.attributes.col.needsUpdate=true;patchMat.uniforms.uCenter.value.set(cx,0,cz);}
 
 /* ---------- 500 series model ---------- */
-/* 500 series: near-circular upper body, boxier skirt down to 0.5 m over the bogies, 15 m conical nose with a raised teardrop canopy */
-const NU=2.3,NL=4.5,W5=3.38,YB=.5,YT=3.69,LN=15,MR=40;
-function prof(x,len,nf,nr){let t=1;if(nf&&x>len/2-LN)t=(len/2-x)/LN;else if(nr&&x<-len/2+LN)t=(x+len/2)/LN;t=t<0?0:t>1?1:t;
- const w=W5*(.04+.96*(1-Math.pow(1-t,1.45))),yb=YB+.6*Math.pow(1-t,3.5),yt=1.25+(YT-1.25)*(1-Math.pow(1-t,1.25));
- const u=(t-.68)/(t<.68?.17:.1),bump=t<1?.42*Math.pow(Math.max(0,1-u*u),.7):0;
- return [w,yb,yt,bump,t,yb+.42*(yt-yb)];}
-function sec(th,p,gr){const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?NU:NL,b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,12);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
-function carGeo(len,nf,nr){const xs=[],NK=40;
- if(nr)for(let k=0;k<=NK;k++)xs.push(-len/2+LN*Math.pow(k/NK,1.7));else xs.push(-len/2);
- if(nf)for(let k=NK;k>=0;k--)xs.push(len/2-LN*Math.pow(k/NK,1.7));else xs.push(len/2);
+/* 500 series, fitted to a JR West V-set elevation drawing (end car, 27 m; measured at 55.7 px/m).
+   d = metres back from the nose tip. Tables are half-width, top-of-nose (without canopy), canopy rise, underside. */
+const W5=3.38,YB=.32,YT=3.72,LN=15,MR=40,NU=2.3;
+const TAB_W=[[0,.15],[.13,.235],[.41,.42],[.77,.59],[1.31,.825],[1.85,1.025],[2.39,1.17],[2.93,1.285],[3.47,1.375],[4.01,1.44],[4.54,1.49],[5.08,1.52],[5.62,1.55],[6.16,1.58],[6.7,1.6],[8.3,1.61],[8.86,1.635],[9.93,1.66],[11,1.69],[15,1.69]];
+const TAB_T=[[0,.7],[.36,.97],[.72,1.11],[1.08,1.28],[1.44,1.4],[1.8,1.54],[2.16,1.67],[2.52,1.8],[2.88,1.92],[3.23,2.03],[3.59,2.16],[4.5,2.33],[5.5,2.52],[6.5,2.71],[7.5,2.9],[8.5,3.1],[9.71,3.32],[10.4,3.38],[10.8,3.43],[11.5,3.52],[12.2,3.59],[12.9,3.66],[14,3.71],[15,3.72]];
+const TAB_C=[[3.7,0],[4,.12],[4.5,.25],[5,.31],[5.5,.35],[6,.37],[6.5,.38],[7,.36],[7.5,.33],[8,.27],[8.5,.19],[9,.1],[9.7,0]];
+const TAB_B=[[0,.64],[.36,.48],[.72,.43],[1.08,.38],[1.44,.32],[15,.32]];
+function tab(T,d){if(d<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(d<=T[i][0]){const [d0,v0]=T[i-1],[d1,v1]=T[i];return v0+(v1-v0)*(d-d0)/(d1-d0);}return T[T.length-1][1];}
+function noseD(x,len,nf,nr){if(nf&&x>len/2-LN)return len/2-x;if(nr&&x<-len/2+LN)return x+len/2;return LN;}
+/* section params: [full width, underside, top (no canopy), canopy rise, d, waist height, lower exponent] */
+function prof(x,len,nf,nr){const d=Math.max(0,noseD(x,len,nf,nr)),yb=tab(TAB_B,d),yt=tab(TAB_T,d);
+ return [2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb+.43*(yt-yb),3+6*(d>=8?1:(d/8)*(d/8)*(3-2*d/8))];}
+function sec(th,p,gr){const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?NU:p[6],b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,14);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
+/* point on the upper surface at lateral offset z (canopy included) */
+function topAt(p,z,gr){const a=p[0]/2+gr,q=Math.min(.999,Math.abs(z)/a),u=Math.pow(1-Math.pow(q,NU),1/NU),b=p[2]-p[5]+gr,s=Math.pow(u,NU/2);return p[5]+b*u+p[3]*Math.pow(s,14);}
+function carGeo(len,nf,nr){const xs=[],NK=48;
+ if(nr)for(let k=0;k<=NK;k++)xs.push(-len/2+LN*Math.pow(k/NK,1.6));else xs.push(-len/2);
+ if(nf)for(let k=NK;k>=0;k--)xs.push(len/2-LN*Math.pow(k/NK,1.6));else xs.push(len/2);
  const pos=[],idx=[];for(const x of xs){const p=prof(x,len,nf,nr);for(let m=0;m<MR;m++){const q=sec(m/MR*Math.PI*2,p,0);pos.push(x,q[1],q[0]);}}
  const R=xs.length;for(let r=0;r<R-1;r++)for(let m=0;m<MR;m++){const a=r*MR+m,b=r*MR+(m+1)%MR,c=(r+1)*MR+(m+1)%MR,d=(r+1)*MR+m;idx.push(a,d,c,a,c,b);}
  const p0=prof(xs[0],len,nf,nr),p1=prof(xs[R-1],len,nf,nr),c0=pos.length/3;pos.push(xs[0],(p0[1]+p0[2])/2,0,xs[R-1],(p1[1]+p1[2])/2,0);
@@ -223,28 +231,41 @@ function carGeo(len,nf,nr){const xs=[],NK=40;
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g;}
 const HB=[.45,.62,.95],HS=[.1,.3,1.0],HC=[.8,.9,1.0],HG=[.25,.4,.6],HPn=[.6,.8,1.0];
 function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
- const zOn=(x,y)=>{const p=P(x),yc=p[5];let q,n;if(y>=yc){q=(y-yc)/(p[2]-yc);n=NU;}else{q=(yc-y)/(yc-p[1]);n=NL;}if(q>=.999)return null;return (p[0]/2+.03)*Math.pow(1-Math.pow(q,n),1/n);};
+ /* x for a distance d back from this car's nose; dOf for the reverse */
+ const xAt=d=>nf?len/2-d:nr?-len/2+d:null,dOf=x=>nf?len/2-x:nr?x+len/2:1e9;
+ const zOn=(x,y)=>{const p=P(x),yc=p[5];let q,n;if(y>=yc){q=(y-yc)/(p[2]-yc);n=NU;}else{q=(yc-y)/(yc-p[1]);n=p[6];}if(q>=.999)return null;return (p[0]/2+.03)*Math.pow(1-Math.pow(q,n),1/n);};
  const xs=[];for(let x=-len/2;x<=len/2+1e-6;x+=.5)xs.push(x);
- const lon=(y,c)=>{for(const sd of[-1,1]){let p=null;for(const x of xs){const z=zOn(x,y);if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}};
- lon(2.55,mul(HB,1.3));lon(1.95,mul(HB,1.1));lon(1.5,mul(HS,3.2));lon(1.64,mul(HS,3.2));lon(.95,mul(HB,.6));lon(.62,mul(HB,.45));
- const xb0=nr?-len/2+LN:-len/2,xb1=nf?len/2-LN:len/2,doors=[nr?-len/2+LN+1.2:-len/2+1.8,nf?len/2-LN-1.2:len/2-1.8];
+ const lon=(y,c,dMin=0)=>{for(const sd of[-1,1]){let p=null;for(const x of xs){const z=dOf(x)>=dMin?zOn(x,y):null;if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}};
+ const along=(th,c)=>{let p=null;for(const x of xs){const q=sec(th,P(x),.03),v=[x,q[1],q[0]];if(p)S.add(p,v,c);p=v;}};
+ /* livery, heights from the drawing */
+ along(1.0,mul(HB,.7));along(Math.PI-1.0,mul(HB,.7));          /* blue-grey roof edge (3.45 m on the body) */
+ lon(2.77,mul(HB,1.25),11.2);lon(2.19,mul(HB,1.0),11.2);         /* dark window band */
+ lon(2.15,mul(HS,3.2),11.2);lon(1.89,mul(HS,3.2),11.2);          /* navy stripe */
+ lon(1.24,mul(HB,.45),4);                                        /* underframe line */
  const rect=(x0,x1,y0,y1,c)=>{for(const sd of[-1,1]){for(const x of[x0,x1]){let p=null;for(let k=0;k<=6;k++){const y=y0+(y1-y0)*k/6,z=zOn(x,y);if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}
   for(const y of[y0,y1]){const za=zOn(x0,y),zb=zOn(x1,y);if(za!==null&&zb!==null)S.add([x0,y,sd*za],[x1,y,sd*zb],c);}}};
- for(const d of doors)rect(d-.475,d+.475,1.25,2.95,mul(HB,1.3));
- for(let x=xb0+2.6;x<=xb1-2.6;x+=1.05){if(doors.some(d=>Math.abs(x-d)<1.1))continue;rect(x-.27,x+.27,2.08,2.42,mul(HB,.8));}
+ const doors=nf?[xAt(10.35),-len/2+3.1]:nr?[xAt(10.35),len/2-3.1]:[-len/2+1.6,len/2-1.6];
+ for(const d of doors)rect(d-.385,d+.385,1.3,3.2,mul(HB,1.3));
+ const wx0=Math.min(...doors)+1.4,wx1=Math.max(...doors)-1.4;
+ for(let x=wx0;x<=wx1;x+=1.03)rect(x-.36,x+.36,2.21,2.69,mul(HB,.85));
  const ring=x=>{const p=P(x);let q0=null;for(let m=0;m<=MR;m++){const q=sec(m/MR*Math.PI*2,p,.03),v=[x,q[1],q[0]];if(q0)S.add(q0,v,mul(HB,.7));q0=v;}};
  if(!nr)ring(-len/2+.05);if(!nf)ring(len/2-.05);
- const nose=front=>{const nx=t=>front?len/2-t*LN:-len/2+t*LN,np=(th,t)=>{const x=nx(t),q=sec(th,P(x),.03);return [x,q[1],q[0]];};
-  const ta=.52,tb=.83,cc=mul(HC,2.4),ci=mul(HC,1.1);
-  for(const [k0,col] of[[.44,cc],[.33,ci]])for(const sd of[-1,1]){let p=null;for(let k=0;k<=24;k++){const u=k/24,q=np(Math.PI/2+sd*k0*Math.pow(Math.sin(Math.PI*u),.65),ta+(tb-ta)*u);if(p)S.add(p,q,col);p=q;}}
-  let p=null;for(let k=0;k<=16;k++){const q=np(Math.PI/2,ta*k/16);if(p)S.add(p,q,mul(HB,1.4));p=q;}
-  p=null;for(let k=0;k<=10;k++){const q=np(Math.PI/2,tb+(1-tb)*k/10);if(p)S.add(p,q,mul(HB,.9));p=q;}
-  for(const th of[0,Math.PI]){let p=null;for(let k=0;k<=24;k++){const q=np(th,k/24);if(p)S.add(p,q,mul(HB,1.1));p=q;}}
-  for(const th of[-.5,Math.PI+.5]){let p=null;for(let k=0;k<=24;k++){const q=np(th,k/24);if(p)S.add(p,q,mul(HS,2.6));p=q;}}};
- if(nf)nose(true);if(nr)nose(false);
- for(const xb of[-8.75,8.75])for(const sd of[-1,1]){const z=sd*1.05,c=HG;S.add([xb-1.6,.28,z],[xb+1.6,.28,z],c);S.add([xb+1.6,.28,z],[xb+1.6,.48,z],c);S.add([xb-1.6,.48,z],[xb-1.6,.28,z],c);
-  for(const ax of[-1.25,1.25]){let p=null;for(let k=0;k<=12;k++){const an=k/12*Math.PI*2,q=[xb+ax+Math.cos(an)*.43,.43+Math.sin(an)*.43,sd*.75];if(p)S.add(p,q,c);p=q;}}}
- if(px!==null){const c=mul(HPn,1.4),y0=3.74;for(const sd of[-1,1])S.add([px-.8,y0,sd*.5],[px+.8,y0,sd*.5],c);S.add([px-.8,y0,-.5],[px-.8,y0,.5],c);S.add([px+.8,y0,-.5],[px+.8,y0,.5],c);
+ /* cockpit: canopy fairing 2.75-9.2 m (half-width 0.85), glazing 3.1-6.4 m with its frames */
+ const nose=()=>{const pt=(d,z,gr)=>{const x=xAt(d);return [x,topAt(P(x),z,gr),z];},cc=mul(HC,2.4),ci=mul(HC,1.3),cf=mul(HB,1.3);
+  const loop=(d0,d1,hw,peak,col)=>{for(const sd of[-1,1]){let p=null;for(let k=0;k<=28;k++){const u=k/28,f=u<peak?Math.sin(Math.PI/2*u/peak):Math.cos(Math.PI/2*(u-peak)/(1-peak)),q=pt(d0+(d1-d0)*u,sd*hw*Math.pow(Math.max(0,f),.55),.04);if(p)S.add(p,q,col);p=q;}}};
+  loop(2.75,9.2,.85,.45,cf);loop(3.1,6.4,.66,.55,cc);
+  {const d=5.45,hw=.66*Math.pow(Math.cos(Math.PI/2*(d-3.1-.55*3.3)/(.45*3.3)),.55);let p=null;for(let k=0;k<=8;k++){const q=pt(d,-hw+2*hw*k/8,.05);if(p)S.add(p,q,ci);p=q;}}
+  {let p=null;for(let k=0;k<=6;k++){const q=pt(5.45+.95*k/6,0,.05);if(p)S.add(p,q,ci);p=q;}}
+  {let p=null;for(let k=0;k<=10;k++){const q=pt(2.75*k/10,0,.03);if(p)S.add(p,q,mul(HB,1.3));p=q;}}};
+ if(nf||nr)nose();
+ along(0,mul(HB,.5));along(Math.PI,mul(HB,.5));                  /* waist */
+ /* bogies: 2.5 m wheelbase; end cars 5.7 m and 23.2 m from the tip, others 17.5 m centres. Wheels show through skirt cut-outs. */
+ const bog=nf?[xAt(5.7),xAt(23.23)]:nr?[xAt(5.7),xAt(23.23)]:[-8.75,8.75];
+ for(const xb of bog)for(const sd of[-1,1]){const zs=sd*(P(xb)[0]/2+.02),c=HG;
+  let p=null;for(let k=0;k<=16;k++){const an=Math.PI*k/16,q=[xb-2.1*Math.cos(an),.32+.5*Math.sin(an),zs];if(p)S.add(p,q,mul(HB,.6));p=q;}
+  for(const ax of[-1.25,1.25]){let p=null;for(let k=0;k<=16;k++){const an=k/16*Math.PI*2,q=[xb+ax+Math.cos(an)*.43,.43+Math.sin(an)*.43,zs*.98];if(p)S.add(p,q,c);p=q;}}
+  S.add([xb-1.6,.4,zs*.98],[xb+1.6,.4,zs*.98],c);}
+ if(px!==null){const c=mul(HPn,1.4),y0=3.76;for(const sd of[-1,1])S.add([px-.8,y0,sd*.5],[px+.8,y0,sd*.5],c);S.add([px-.8,y0,-.5],[px-.8,y0,.5],c);S.add([px+.8,y0,-.5],[px+.8,y0,.5],c);
   for(const sd of[-.12,.12]){S.add([px+.7,y0+.05,sd],[px-.9,4.4,sd],c);S.add([px-.9,4.4,sd],[px+.25,4.97,sd],c);}
   S.add([px+.25,4.97,-.8],[px+.25,4.97,.8],mul(HPn,2));S.add([px+.25,4.97,.8],[px+.25,4.84,1.02],c);S.add([px+.25,4.97,-.8],[px+.25,4.84,-1.02],c);}
  return S;}
@@ -257,7 +278,7 @@ const HCL=[27,25,25,25,25,25,25,27];
 const heroCars=HCL.map((L,c)=>{const nf=c===0,nr=c===7,geo=carGeo(L,nf,nr),g=new THREE.Group();g.matrixAutoUpdate=false;
  const o=new THREE.Mesh(geo,occMat),h=new THREE.Mesh(geo,hullMat),l=carLines(L,nf,nr,c===2?5:c===5?-5:null).mesh(heroMat,1);
  o.layers.set(1);h.layers.set(1);o.frustumCulled=h.frustumCulled=false;g.add(o,h,l);scene.add(g);return g;});
-const HLX=27/2-3,HLq=sec(-.12,prof(HLX,27,true,false),.06),HL=[[HLX,HLq[1],Math.abs(HLq[0])],[HLX,HLq[1],-Math.abs(HLq[0])]];
+const HLX=27/2-1.0,HLq=sec(-.25,prof(HLX,27,true,false),.06),HL=[[HLX,HLq[1],Math.abs(HLq[0])*.8],[HLX,HLq[1],-Math.abs(HLq[0])*.8]];
 
 /* ---------- dynamic trains, occluders, lights ---------- */
 const MAXV=40000,DP=new Float32Array(MAXV*3),DC=new Float32Array(MAXV*3),dG=new THREE.BufferGeometry();
