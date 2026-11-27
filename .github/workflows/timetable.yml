@@ -51,7 +51,7 @@ jobs:
           git add data/sanyo-timetable.js
           if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           git commit -m "Timetable for $(date -u -d '+9 hours' +%Y-%m-%d)"
-          git push
+          git pull --rebase -q origin main && git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       # pushes made with the workflow token don't start a Pages build on their own

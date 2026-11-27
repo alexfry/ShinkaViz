@@ -1,0 +1,47 @@
+# Builds data/lines/*.js (every Shinkansen line's track, tunnels, viaducts and stations) from OpenStreetMap via the
+# Overpass API, and commits whatever changed. Runs when the builder or the line list changes, monthly, or by hand.
+name: Lines
+
+on:
+  push:
+    branches: [main]
+    paths: ['tools/build_network.py', 'tools/lines.json', 'tools/geo.py', '.github/workflows/lines.yml']
+  schedule:
+    - cron: '41 17 3 * *'     # monthly, to pick up OpenStreetMap fixes
+  workflow_dispatch:
+    inputs:
+      lines:
+        description: 'Line ids to rebuild, space separated (empty for all)'
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: lines
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build lines from OpenStreetMap
+        run: python3 tools/build_network.py ${{ github.event.inputs.lines }}
+      - name: Commit if changed
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/lines
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git commit -m "Lines from OpenStreetMap ($(date -u +%Y-%m-%d))"
+          git pull --rebase -q origin main && git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Republish GitHub Pages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || true
