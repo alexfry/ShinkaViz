@@ -35,8 +35,8 @@ jobs:
           if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
           python3 tools/build_timetable.py $ARGS --dump tools/.cache/pages
 
-      - name: Keep raw pages if parsing failed
-        if: failure()
+      - name: Keep a sample of the raw pages (for checking the parser)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: timetable-pages

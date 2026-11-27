@@ -13,7 +13,7 @@ A few short workings that never depart from one of those four stations (e.g. a H
 Usage:  python3 tools/build_timetable.py [--date YYYYMMDD] [--out data/sanyo-timetable.js] [--dump DIR]
 The date defaults to today in Japan. --dump saves the raw pages, for debugging the parser.
 """
-import argparse, datetime, html, json, os, re, sys, time, urllib.request
+import argparse, datetime, html, json, os, re, sys, time, unicodedata, urllib.request
 from html.parser import HTMLParser
 
 BASE = 'https://timetable.jr-odekake.net'
@@ -63,7 +63,9 @@ class Text(HTMLParser):
         if not self.skip: self.out.append(d)
 
     def lines(self):
-        return [re.sub(r'\s+', ' ', l).strip() for l in ''.join(self.out).split('\n') if l.strip()]
+        # NFKC folds full-width letters and digits (Ｎ７００系, ８両) to ASCII
+        t = unicodedata.normalize('NFKC', ''.join(self.out))
+        return [re.sub(r'\s+', ' ', l).strip() for l in t.split('\n') if l.strip()]
 
 
 def text_lines(page):
