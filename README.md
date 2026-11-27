@@ -28,6 +28,18 @@ Controls:
 - **View menu:** persistence and glow sliders, plus layer toggles (terrain, coastline, rivers, motorways, trunk roads, JR lines, other railways).
 - Time speed 1×–300×. Drag to orbit, pinch or scroll to zoom.
 
+## Running it
+
+```
+python3 -m http.server 8000      # in the repo folder, then open http://localhost:8000
+```
+
+When the page can reach them, it streams **live map tiles**:
+- **Map features:** [OpenFreeMap](https://openfreemap.org) vector tiles (OpenMapTiles schema) for coastline, lakes, rivers, motorway and trunk roads, and conventional railways.
+- **Elevation:** [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium) for contours, ground under the camera and viaducts, and the track's height profile.
+
+Tiles are picked around the camera, fine near and coarse far, and turned into line work per tile. The decoder for the vector tile format is built in, so there's nothing to install. Add `#offline` to the URL to force the built-in data. The claude.ai published page can't reach outside hosts, so it always uses the built-in data (`data/*.js`).
+
 ## Rendering
 
 - Lines are additive and HDR. Train bodies are black occluders, giving hidden-line removal.

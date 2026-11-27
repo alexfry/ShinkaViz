@@ -71,7 +71,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
   <div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div>
   <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><hr></div></details>
-      <p id="note"><span id="src"></span> Terrain is procedural and the timetable is an invented sample. 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom. <span id="credit" hidden>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</span></p>
+      <p id="note"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom. <span id="credit" hidden>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</span></p>
 </div>
 <div id="msg">Building scene…</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -82,9 +82,9 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 const $=s=>document.querySelector(s);
 const msg=$('#msg');
 if(!window.THREE)msg.textContent='Could not load the 3D library.';
-else setTimeout(()=>{try{init();}catch(e){console.error(e);msg.textContent='This device could not start the WebGL renderer.';}},40);
+else setTimeout(()=>{init().catch(e=>{console.error(e);msg.textContent='This device could not start the WebGL renderer.';});},40);
 
-function init(){
+async function init(){
 const canvas=$('#c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
 renderer.autoClear=false;renderer.setClearColor(0x000000,1);
@@ -113,6 +113,27 @@ const SC=LINE?stations.map(s=>LINE.stations.find(x=>x.ja===s.ja).s):stations.map
 if(LINE)stations.forEach((s,k)=>{const i=Math.min(N,Math.round(SC[k]/DS));s.x=PX[i];s.z=PZ[i];});
 const PC=SC.map(s=>Math.min(Math.max(s,260),LEN-260));
 
+/* ---------- live map tiles: OpenFreeMap vector tiles (OpenMapTiles schema) + AWS Terrain Tiles (Terrarium) ----------
+   Used when the page can reach them (served locally or from your own host). Add #offline to the URL to force the built-in data. */
+let LIVE=null;
+if(!/offline/.test(location.hash)){try{msg.textContent='Connecting to map tiles…';const ac=new AbortController(),to=setTimeout(()=>ac.abort(),6000);
+ const r=await fetch('https://tiles.openfreemap.org/planet',{signal:ac.signal});clearTimeout(to);const j=await r.json();
+ if(j.tiles&&j.tiles[0])LIVE={vt:j.tiles[0],vmax:Math.min(14,j.maxzoom||14),tt:'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'};}catch(e){console.info('Live tiles unavailable, using built-in data.',e&&e.message);}}
+const R2D=180/Math.PI;
+const xzToLL=(X,Z)=>[X/KX+LON0,-Z/KZ+LAT0];
+function llToTile(lon,lat,z){const n=2**z,s=Math.sin(lat/R2D);return [(lon+180)/360*n,(1-Math.log((1+s)/(1-s))/(2*Math.PI))/2*n];}
+function tileXZ(z,x,y,fx,fy){const n=2**z,lon=(x+fx)/n*360-180,lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+fy)/n)))*R2D;return [(lon-LON0)*KX,-(lat-LAT0)*KZ];}
+/* terrain cache: key -> Float32Array(256*256) of metres (or 'loading' / 'fail') */
+const TC=new Map();
+function loadTerrain(key){if(TC.has(key))return TC.get(key).p||Promise.resolve();const [z,x,y]=key.split('/').map(Number),e={st:'loading'};TC.set(key,e);
+ e.p=new Promise(res=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.drawImage(img,0,0);
+   const d=g.getImageData(0,0,256,256).data,h=new Float32Array(65536);for(let i=0;i<65536;i++)h[i]=d[i*4]*256+d[i*4+1]+d[i*4+2]/256-32768;e.h=h;e.st='ok';}catch(er){e.st='fail';}res();};
+  img.onerror=()=>{e.st='fail';res();};img.src=LIVE.tt.replace('{z}',z).replace('{x}',x).replace('{y}',y);});return e.p;}
+/* best available elevation at a local x,z (null if no tile loaded there) */
+function heightAt(X,Z){const [lon,lat]=xzToLL(X,Z);for(let z=12;z>=5;z--){const [tx,ty]=llToTile(lon,lat,z),xi=Math.floor(tx),yi=Math.floor(ty),e=TC.get(`${z}/${xi}/${yi}`);
+  if(e&&e.st==='ok'){const u=(tx-xi)*255,v=(ty-yi)*255,i0=Math.min(254,u|0),j0=Math.min(254,v|0),fu=u-i0,fv=v-j0,h=e.h,a=h[j0*256+i0],b=h[j0*256+i0+1],c=h[(j0+1)*256+i0],d=h[(j0+1)*256+i0+1];
+   return a+(b-a)*fu+(c-a)*fv+(a-b-c+d)*fu*fv;}}return null;}
+
 /* ---------- procedural terrain (placeholder for GSI DEM) ---------- */
 function hash(i,j){let h=(Math.imul(i,374761393)+Math.imul(j,668265263))|0;h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967296;}
 function vnoise(x,y){const i=Math.floor(x),j=Math.floor(y),fx=x-i,fy=y-j,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy);const a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
@@ -125,6 +146,16 @@ const hs=new Float64Array(N+1);for(let i=0;i<=N;i++)hs[i]=Hx(PX[i],PZ[i],zAt(PX[
  for(let i=0;i<=N;i++){const a=Math.max(0,i-W),b=Math.min(N,i+W);PY[i]=Math.max((pre[b+1]-pre[a])/(b-a+1),4)+9;}
  if(LINE)for(let i=0;i<=N;i++){const f=LINE.flags[i];TUN[i]=f==='1'?1:0;BRG[i]=f==='2'?1:0;}
  else{for(let i=0;i<=N;i++)TUN[i]=hs[i]>PY[i]+4?1:0;for(let k=0;k<NS;k++){const c=Math.round(PC[k]/DS);for(let i=Math.max(0,c-16);i<=Math.min(N,c+16);i++)TUN[i]=0;}}}
+/* live: real ground along the line (z10 elevation tiles); viaducts at deck height, embankments low, tunnels interpolated between their portals */
+if(LIVE){msg.textContent='Loading terrain along the line…';const need=new Set();
+ for(let i=0;i<=N;i+=10){const [lo,la]=xzToLL(PX[i],PZ[i]),[tx,ty]=llToTile(lo,la,10);need.add(`10/${tx|0}/${ty|0}`);}
+ await Promise.all([...need].map(loadTerrain));let got=0;
+ for(let i=0;i<=N;i++){const h=heightAt(PX[i],PZ[i]);if(h!==null){hs[i]=Math.max(h,0);got++;}}
+ if(got>N*.9){const g=new Float64Array(N+1);for(let i=0;i<=N;i++){let a=0,c=0;for(let k=Math.max(0,i-4);k<=Math.min(N,i+4);k++){a+=hs[k];c++;}g[i]=a/c;}
+  for(let i=0;i<=N;i++)PY[i]=g[i]+(BRG[i]?10:2.5);
+  for(let i=0;i<=N;){if(!TUN[i]){i++;continue;}let j=i;while(j<=N&&TUN[j])j++;const a=PY[Math.max(0,i-1)],b=PY[Math.min(N,j)];for(let k=i;k<j;k++)PY[k]=a+(b-a)*(k-i+1)/(j-i+1);i=j;}
+  const q=Float64Array.from(PY);for(let i=0;i<=N;i++){let a=0,c=0;for(let k=Math.max(0,i-10);k<=Math.min(N,i+10);k++){a+=q[k];c++;}PY[i]=Math.max(a/c,1);}}
+ else{console.warn('Terrain tiles did not load; keeping the procedural profile.');}}
 
 /* ---------- track helpers ---------- */
 const TP={x:0,y:0,z:0,tx:1,tz:0,i:0};
@@ -169,7 +200,7 @@ for(const dr of[1,-1]){let p=sp(0,dr*2.15);p[1]+=5;for(let i=1;i<=N;i++){const q
 for(let i=0;i<=N;i++){if(TUN[i])continue;const s=i*DS;if(Math.abs(s-PC[nearestK(s)])<640)continue;for(const dr of[1,-1]){const b=sp(i,dr*5.3);sW.add(b,[b[0],b[1]+7.2,b[2]],POLE);const e=sp(i,dr*1.2);e[1]+=6.6;sW.add([b[0],b[1]+6.6,b[2]],e,POLE);}}
 let minX=1e30,maxX=-1e30,minZ=1e30,maxZ=-1e30;for(let i=0;i<=N;i++){minX=Math.min(minX,PX[i]);maxX=Math.max(maxX,PX[i]);minZ=Math.min(minZ,PZ[i]);maxZ=Math.max(maxZ,PZ[i]);}
 const CX=(minX+maxX)/2,CZ=(minZ+maxZ)/2;
-{const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/G)+1,nz=Math.ceil((maxZ+50000-z0)/G)+1,h=new Float32Array(nx*nz);
+if(!LIVE){const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/G)+1,nz=Math.ceil((maxZ+50000-z0)/G)+1,h=new Float32Array(nx*nz);
  for(let i=0;i<nx;i++){const x=x0+i*G,zt=zAt(x);for(let j=0;j<nz;j++)h[j*nx+i]=Hx(x,z0+j*G,zt);}
  const MS=[[],[3,0],[0,1],[3,1],[1,2],[3,0,1,2],[0,2],[3,2],[2,3],[0,2],[0,1,2,3],[1,2],[1,3],[0,1],[0,3],[]];
  for(let L=CTX&&CTX.layers.coast&&CTX.layers.coast.length?100:0;L<=1000;L+=100){const col=L===0?[.08,.34,.44]:mul([.045,.13,.17],.6+L/1000);
@@ -190,10 +221,89 @@ const contourObj=sC.mesh(contourMat);scene.add(contourObj,sT.mesh(trackMat),sW.m
 const CTXL={coast:{c:[.12,.5,.75],k:1.3,ja:'海岸線',en:'Coastline'},river:{c:[.1,.35,.8],k:1.0,ja:'河川',en:'Rivers'},motorway:{c:[1,.45,.1],k:.75,ja:'高速道路',en:'Motorways'},
  trunk:{c:[.8,.4,.12],k:.4,ja:'国道',en:'Trunk roads'},jr:{c:[.7,.3,1],k:1.0,ja:'JR在来線',en:'JR lines'},rail:{c:[.5,.35,.7],k:.5,ja:'その他の鉄道',en:'Other railways'}};
 const layerObjs={};
-if(CTX)for(const [k,L] of Object.entries(CTXL)){const lines=CTX.layers[k];if(!lines||!lines.length)continue;const S=new Seg(),col=mul(L.c,L.k),lift=k==='jr'||k==='rail'?1.5:.8;
+if(CTX&&!LIVE)for(const [k,L] of Object.entries(CTXL)){const lines=CTX.layers[k];if(!lines||!lines.length)continue;const S=new Seg(),col=mul(L.c,L.k),lift=k==='jr'||k==='rail'?1.5:.8;
  for(const a of lines){let p=null;for(let i=0;i<a.length;i+=2){const x=a[i],z=a[i+1],q=[x,k==='coast'?.3:Math.max(Hx(x,z,zAt(x)),0)+lift,z];if(p)S.add(p,q,col);p=q;}}
  const mat=lineMat(),o=S.mesh(mat);scene.add(o);layerObjs[k]={o,mat};}
-const SRC_NOTE=LINE?'Track alignment, tunnels and viaducts'+(CTX?', plus coastline, rivers, roads and other railways,':'')+' from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
+const SRC_NOTE=LIVE?'Live map: OpenStreetMap data via OpenFreeMap vector tiles, terrain from AWS Terrain Tiles; track alignment from OpenStreetMap.':LINE?'Track alignment, tunnels and viaducts'+(CTX?', plus coastline, rivers, roads and other railways,':'')+' from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
+
+/* ---------- live tile manager: vector + elevation tiles around the camera (fine near, coarse far), line work built per tile ---------- */
+const LIVE_LAYERS=['coast','river','motorway','trunk','rail'];
+const LTM={tiles:new Map(),busy:0,last:0,want:0,ready:0,on:{terrain:true,coast:true,river:true,motorway:true,trunk:true,rail:true},mats:{}};
+if(LIVE){for(const k of LIVE_LAYERS)LTM.mats[k]=lineMat();CTXL.rail={c:[.7,.3,1],k:.9,ja:'在来線',en:'Railways'};delete CTXL.jr;}
+/* Shinkansen proximity (to skip it in the tile railways, since we draw it ourselves) */
+const LGRID=new Map();for(let i=0;i<=N;i++){const k=Math.floor(PX[i]/100)+','+Math.floor(PZ[i]/100);if(!LGRID.has(k))LGRID.set(k,[]);LGRID.get(k).push(i);}
+function nearLine(X,Z,r){const cx=Math.floor(X/100),cz=Math.floor(Z/100);for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const l=LGRID.get((cx+a)+','+(cz+b));if(l)for(const i of l)if((PX[i]-X)**2+(PZ[i]-Z)**2<r*r)return true;}return false;}
+/* minimal Mapbox Vector Tile decoder (protobuf) */
+const TD=new TextDecoder();
+function decodeMVT(buf){const b=new Uint8Array(buf),dv=new DataView(buf),out={};let p=0;
+ const vi=()=>{let r=0,m=1,c;do{c=b[p++];r+=(c&127)*m;m*=128;}while(c&128);return r;};
+ const skip=t=>{if(t===0)vi();else if(t===1)p+=8;else if(t===2){const l=vi();p+=l;}else if(t===5)p+=4;};
+ while(p<b.length){const k=vi();if((k>>3)===3&&(k&7)===2){const ln0=vi(),end=p+ln0,L={name:'',extent:4096,keys:[],values:[],feats:[]};
+   while(p<end){const k2=vi(),f2=k2>>3,t2=k2&7;
+    if(f2===1){const l=vi();L.name=TD.decode(b.subarray(p,p+l));p+=l;}
+    else if(f2===2){const ln1=vi(),fe=p+ln1,F={type:0,tags:[],geom:[]};
+     while(p<fe){const k3=vi(),f3=k3>>3,t3=k3&7;if(f3===2&&t3===2){const l3=vi(),e3=p+l3;while(p<e3)F.tags.push(vi());}else if(f3===3)F.type=vi();else if(f3===4&&t3===2){const l3=vi(),e3=p+l3;while(p<e3)F.geom.push(vi());}else skip(t3);}
+     L.feats.push(F);}
+    else if(f2===3){const l=vi();L.keys.push(TD.decode(b.subarray(p,p+l)));p+=l;}
+    else if(f2===4){const l4=vi(),ve=p+l4;let v=null;while(p<ve){const k4=vi(),f4=k4>>3,t4=k4&7;
+      if(f4===1){const l=vi();v=TD.decode(b.subarray(p,p+l));p+=l;}else if(f4===2){v=dv.getFloat32(p,true);p+=4;}else if(f4===3){v=dv.getFloat64(p,true);p+=8;}
+      else if(f4===4||f4===5)v=vi();else if(f4===6){const n=vi();v=n%2?-(n+1)/2:n/2;}else if(f4===7)v=!!vi();else skip(t4);}
+     L.values.push(v);}
+    else if(f2===5)L.extent=vi();else skip(t2);}
+   out[L.name]=L;}else skip(k&7);}
+ return out;}
+function geomLines(g){const out=[];let x=0,y=0,i=0,ln=null;const zz=n=>(n>>>1)^-(n&1);
+ while(i<g.length){const ci=g[i++],cmd=ci&7,cnt=ci>>>3;
+  if(cmd===1)for(let k=0;k<cnt;k++){x+=zz(g[i++]);y+=zz(g[i++]);ln=[x,y];out.push(ln);}
+  else if(cmd===2)for(let k=0;k<cnt;k++){x+=zz(g[i++]);y+=zz(g[i++]);ln.push(x,y);}
+  else if(cmd===7&&ln)ln.push(ln[0],ln[1]);}
+ return out;}
+function tileRect(z,x,y){const a=tileXZ(z,x,y,0,0),b=tileXZ(z,x,y,1,1);return [a[0],a[1],b[0],b[1]];}
+function pickTiles(zmax,kf,maxD,out,pref){const c=cam.position,[lo0,la1]=xzToLL(c.x-maxD,c.z-maxD),[lo1,la0]=xzToLL(c.x+maxD,c.z+maxD),[ax,ay]=llToTile(lo0,la1,5),[bx,by]=llToTile(lo1,la0,5);
+ const visit=(z,x,y)=>{const r=tileRect(z,x,y),dx=Math.max(r[0]-c.x,0,c.x-r[2]),dz=Math.max(r[1]-c.z,0,c.z-r[3]),d=Math.hypot(dx,dz,Math.max(c.y,0));if(d>maxD)return;
+  if(z<zmax&&d<(r[2]-r[0])*kf){visit(z+1,2*x,2*y);visit(z+1,2*x+1,2*y);visit(z+1,2*x,2*y+1);visit(z+1,2*x+1,2*y+1);}else out.push({key:pref+'/'+z+'/'+x+'/'+y,kind:pref,z,x,y,d});};
+ for(let x=Math.floor(ax);x<=Math.floor(bx);x++)for(let y=Math.floor(ay);y<=Math.floor(by);y++)visit(5,x,y);}
+function tileEntry(t){let e=LTM.tiles.get(t.key);if(!e){e={...t,st:'idle',objs:{},used:0};LTM.tiles.set(t.key,e);}return e;}
+function startLoad(e){e.st='loading';LTM.busy++;const done=()=>{LTM.busy--;};
+ if(e.kind==='t')loadTerrain(`${e.z}/${e.x}/${e.y}`).then(()=>{const t=TC.get(`${e.z}/${e.x}/${e.y}`);e.st=t&&t.st==='ok'?'ready':'fail';e.readyAt=performance.now();done();});
+ else fetch(LIVE.vt.replace('{z}',e.z).replace('{x}',e.x).replace('{y}',e.y)).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status)).then(buf=>{e.data=decodeMVT(buf);e.st='ready';e.readyAt=performance.now();done();}).catch(()=>{e.st='fail';done();});}
+const MSQ=[[],[3,0],[0,1],[3,1],[1,2],[3,0,1,2],[0,2],[3,2],[2,3],[0,2],[0,1,2,3],[1,2],[1,3],[0,1],[0,3],[]];
+function buildTerrain(e){const t=TC.get(`${e.z}/${e.x}/${e.y}`),h=t.h,st=2,n=128,iv=e.z>=11?50:e.z>=9?100:200,S=new Seg();
+ const G=new Float64Array((n+1)*(n+1)*2),H=new Float32Array((n+1)*(n+1));let lo=1e9,hi=-1e9;
+ for(let j=0;j<=n;j++)for(let i=0;i<=n;i++){const [X,Z]=tileXZ(e.z,e.x,e.y,i/n,j/n),k=j*(n+1)+i,v=h[Math.min(255,j*st)*256+Math.min(255,i*st)];G[k*2]=X;G[k*2+1]=Z;H[k]=v;lo=Math.min(lo,v);hi=Math.max(hi,v);}
+ for(let L=Math.max(iv,Math.ceil(lo/iv)*iv);L<=hi;L+=iv){const col=mul([.045,.13,.17],.6+Math.min(L,2000)/1000);
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const ka=j*(n+1)+i,kb=ka+1,kc=ka+n+2,kd=ka+n+1,a=H[ka],b=H[kb],c=H[kc],d=H[kd];
+   const m=(a>L?1:0)|(b>L?2:0)|(c>L?4:0)|(d>L?8:0);if(m===0||m===15)continue;
+   const ip=(p,q,va,vb)=>{const f=(L-va)/(vb-va);return [G[p*2]+(G[q*2]-G[p*2])*f,L,G[p*2+1]+(G[q*2+1]-G[p*2+1])*f];};
+   const ed=k=>k===0?ip(ka,kb,a,b):k===1?ip(kb,kc,b,c):k===2?ip(kd,kc,d,c):ip(ka,kd,a,d),ms=MSQ[m];for(let q=0;q<ms.length;q+=2)S.add(ed(ms[q]),ed(ms[q+1]),col);}}
+ if(S.p.length){e.objs.terrain=S.mesh(contourMat);scene.add(e.objs.terrain);}}
+function buildVector(e){const S={},T=e.data;
+ const seg=(lay,f,k,lift,sea,mulc)=>{const E=lay.extent,col=mul(CTXL[k].c,CTXL[k].k*mulc),sg=S[k]||(S[k]=new Seg());
+  for(const ln of geomLines(f.geom)){let pa=null,ax=0,ay=0;for(let i=0;i<ln.length;i+=2){const x=ln[i],y=ln[i+1],[X,Z]=tileXZ(e.z,e.x,e.y,x/E,y/E);let Y;
+    if(sea)Y=.3;else{const g=heightAt(X,Z);Y=Math.max(g===null?0:g,0)+lift;}const q=[X,Y,Z];
+    if(pa&&!((ax<=0&&x<=0)||(ax>=E&&x>=E)||(ay<=0&&y<=0)||(ay>=E&&y>=E))&&!(k==='rail'&&nearLine(X,Z,35)))sg.add(pa,q,col);pa=q;ax=x;ay=y;}}};
+ const props=(lay,f)=>{const o={};for(let i=0;i<f.tags.length;i+=2)o[lay.keys[f.tags[i]]]=lay.values[f.tags[i+1]];return o;};
+ if(T.water)for(const f of T.water.feats){const o=props(T.water,f);if(o.class==='ocean')seg(T.water,f,'coast',0,true,1);else if(o.class==='lake')seg(T.water,f,'coast',.3,false,.7);}
+ if(T.waterway)for(const f of T.waterway.feats){const o=props(T.waterway,f);if(o.class==='river'||o.class==='canal')seg(T.waterway,f,'river',.5,false,o.brunnel==='tunnel'?.25:1);}
+ if(T.transportation)for(const f of T.transportation.feats){const o=props(T.transportation,f),tn=o.brunnel==='tunnel'?.25:1;
+  if(o.class==='motorway')seg(T.transportation,f,'motorway',.8,false,tn);else if(o.class==='trunk')seg(T.transportation,f,'trunk',.8,false,tn);
+  else if(o.class==='rail'&&(o.subclass==='rail'||o.subclass==='narrow_gauge')&&!o.service)seg(T.transportation,f,'rail',1.5,false,tn);}
+ for(const k in S)if(S[k].p.length){e.objs[k]=S[k].mesh(LTM.mats[k]);scene.add(e.objs[k]);}
+ e.data=null;}
+function disposeTile(e){for(const k in e.objs){scene.remove(e.objs[k]);e.objs[k].geometry.dispose();}e.objs={};}
+function liveUpdate(now){if(!LIVE||now-LTM.last<250)return;LTM.last=now;
+ const c=cam.position,g=heightAt(c.x,c.z),h=Math.max(c.y-(g===null?0:g),1),maxD=Math.min(Math.max(80000,h*2.2),2e6),want=[];
+ pickTiles(Math.min(13,LIVE.vmax),1.0,maxD,want,'v');pickTiles(11,.9,maxD,want,'t');want.sort((a,b)=>a.d-b.d);
+ const wantSet=new Set(want.map(t=>t.key)),shown=new Set();let built=0,ready=0;
+ for(const t of want){const e=tileEntry(t);e.used=now;
+  if(e.st==='idle'&&LTM.busy<6)startLoad(e);
+  if(e.st==='ready'&&built<3&&(e.kind==='t'||heightAt(...(()=>{const r=tileRect(e.z,e.x,e.y);return [(r[0]+r[2])/2,(r[1]+r[3])/2];})())!==null||now-e.readyAt>4000)){if(e.kind==='t')buildTerrain(e);else buildVector(e);e.st='built';built++;}
+  if(e.st==='built'||e.st==='fail'){shown.add(t.key);ready++;}
+  else{let z=e.z,x=e.x,y=e.y;while(z>5){z--;x>>=1;y>>=1;const a=LTM.tiles.get(e.kind+'/'+z+'/'+x+'/'+y);if(a&&a.st==='built'){shown.add(a.key);a.used=now;break;}}}}
+ LTM.want=want.length;LTM.ready=ready;
+ for(const e of LTM.tiles.values()){const vis=shown.has(e.key);for(const k in e.objs)e.objs[k].visible=vis&&(k==='terrain'?LTM.on.terrain:LTM.on[k]!==false);}
+ if(LTM.tiles.size>450){const old=[...LTM.tiles.values()].filter(e=>!shown.has(e.key)&&e.st!=='loading').sort((a,b)=>a.used-b.used);
+  for(const e of old.slice(0,LTM.tiles.size-350)){disposeTile(e);LTM.tiles.delete(e.key);if(e.kind==='t')TC.delete(`${e.z}/${e.x}/${e.y}`);}}}
 
 /* near terrain grid around the camera target */
 const NPn=61,NPs=100,NPh=(NPn-1)/2*NPs,npSegs=2*NPn*(NPn-1),npPos=new Float32Array(npSegs*6),npCol=new Float32Array(npSegs*6),npH=new Float32Array(NPn*NPn);
@@ -201,7 +311,7 @@ const npG=new THREE.BufferGeometry();npG.setAttribute('position',new THREE.Buffe
 const npL=new THREE.LineSegments(npG,patchMat);npL.frustumCulled=false;scene.add(npL);
 const SEA=[.03,.08,.16],LAND=[.05,.17,.22];let npCx=1e30,npCz=1e30;
 function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs;if(Math.abs(cx-npCx)<300&&Math.abs(cz-npCz)<300)return;npCx=cx;npCz=cz;
- for(let i=0;i<NPn;i++){const X=cx-NPh+i*NPs,zt=zAt(X);for(let j=0;j<NPn;j++)npH[j*NPn+i]=Math.max(Hx(X,cz-NPh+j*NPs,zt),0);}
+ for(let i=0;i<NPn;i++){const X=cx-NPh+i*NPs,zt=zAt(X);for(let j=0;j<NPn;j++){const Zz=cz-NPh+j*NPs,hh=LIVE?heightAt(X,Zz):Hx(X,Zz,zt);npH[j*NPn+i]=Math.max(hh===null?0:hh,0);}}
  let p=0;const put=(i,j)=>{const hh=npH[j*NPn+i],c=hh<=.01?SEA:LAND;npPos[p]=cx-NPh+i*NPs;npPos[p+1]=hh;npPos[p+2]=cz-NPh+j*NPs;npCol[p]=c[0];npCol[p+1]=c[1];npCol[p+2]=c[2];p+=3;};
  for(let j=0;j<NPn;j++)for(let i=0;i<NPn-1;i++){put(i,j);put(i+1,j);}
  for(let i=0;i<NPn;i++)for(let j=0;j<NPn-1;j++){put(i,j);put(i,j+1);}
@@ -548,7 +658,7 @@ function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':ORB.dis
  if(mode==='plat'&&performance.now()-boardT>500){boardT=performance.now();updBoard();}
  if(mode!=='plat'&&performance.now()-selT>2000){selT=performance.now();updTrainSel();}
  const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
- trackMat.uniforms.uMul.value=1-.7*ovf;wireMat.uniforms.uMul.value=1-.92*ovf;patchMat.uniforms.uMul.value=1-ovf;for(const L of Object.values(layerObjs))L.mat.uniforms.uMul.value=1-.4*ovf;}
+ trackMat.uniforms.uMul.value=1-.7*ovf;wireMat.uniforms.uMul.value=1-.92*ovf;patchMat.uniforms.uMul.value=1-ovf;for(const L of Object.values(layerObjs))L.mat.uniforms.uMul.value=1-.4*ovf;for(const m of Object.values(LTM.mats))m.uniforms.uMul.value=1-.4*ovf;}
 $('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
 const pers=$('#pers'),glow=$('#glow');
 
@@ -572,7 +682,7 @@ function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;
  if(!show){el.style.display='none';continue;}el.style.display='';el.style.transform=`translate(${((v3.x*.5+.5)*W).toFixed(1)}px,${((-v3.y*.5+.5)*H).toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=ovf>.3?1:Math.max(0,1-dist/20000).toFixed(2);}}
 const pad=n=>String(n).padStart(2,'0'),fmt=t=>{t=((t%86400)+86400)%86400;return `${pad(t/3600|0)}:${pad((t/60|0)%60)}:${pad(t%60|0)}`;},hm=t=>fmt(t).slice(0,5);
 const E={clock:$('#clock'),cnt:$('#cnt'),spd:$('#spd'),stat:$('#stat'),next:$('#next'),km:$('#km')};let hudT=0,active=0;
-function updHud(){const h=fs,ev=FT.ev,n=SVN[FT.type],md=FT.hero?['500系','500 series']:FT.type==='nozomi'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`;E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
+function updHud(){const h=fs,ev=FT.ev,n=SVN[FT.type],md=FT.hero?['500系','500 series']:FT.type==='nozomi'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`+(LIVE?` · tiles ${LTM.ready}/${LTM.want}`:'');E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
  if(h.stop>=0){const e=ev[h.i];E.stat.textContent=simT<e.dep?`${nm(h.stop)}, leaves ${hm(e.dep)}`:`At ${nm(h.stop)}`;}else E.stat.textContent=TUN[trk(h.s).i]?'トンネル In tunnel':'走行中 Running';
  const ne=ev[h.i+1];E.next.textContent=ne?`${nm(ne.k)} ${hm(ne.arr)}`:'終点 Terminus';E.km.textContent=`${(h.s/1000).toFixed(1)} km from Shin-Osaka`;}
 
@@ -586,7 +696,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  if(FT!==hero){const st=stateAt(FT,simT,FSX);if(!st)setFocus(hero);else{fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(FT,st.s+FT.dir*(FT.len/2-FT.cl[0]/2),FP0);}}
  dG.setDrawRange(0,nv);dG.attributes.position.needsUpdate=true;dG.attributes.col.needsUpdate=true;io.count=ni;io.instanceMatrix.needsUpdate=true;
  pG.setDrawRange(0,np);for(const k of['position','col','sz','kind'])pG.attributes[k].needsUpdate=true;
- updCam(now);updModeUi();if(ovf<.9)patch(HP0.cx,HP0.cz);
+ updCam(now);updModeUi();liveUpdate(now);if(ovf<.9)patch(HP0.cx,HP0.cz);
  hullMat.uniforms.uPix.value=1.5*DPR*2*Math.tan(cam.fov*Math.PI/360)/BH;
  renderer.setRenderTarget(rtMain);renderer.clear(true,true,false);cam.layers.enable(0);cam.layers.enable(1);renderer.render(scene,cam);
  renderer.setRenderTarget(rtTrain);renderer.clear(true,true,false);cam.layers.set(1);renderer.render(scene,cam);cam.layers.enable(0);
@@ -598,13 +708,13 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  const fu=mFinal.uniforms;fu.tMain.value=rtMain.texture;fu.tP.value=cur.texture;fu.b1.value=lv[0].a.texture;fu.b2.value=lv[1].a.texture;fu.b3.value=lv[2].a.texture;fu.b4.value=lv[3].a.texture;fu.b5.value=lv[4].a.texture;fu.uGlow.value=+glow.value;pass(mFinal,null);
  updLabels();if(now-hudT>120){hudT=now;updHud();}}
 window.addEventListener('resize',resize);
-{const box=$('#layerList'),items=[['terrain',{ja:'地形 (仮)',en:'Terrain (placeholder)',c:[.1,.4,.5],k:1}],...Object.entries(CTXL).filter(([k])=>layerObjs[k])];
+{const box=$('#layerList'),items=[['terrain',LIVE?{ja:'地形',en:'Terrain',c:[.1,.4,.5],k:1}:{ja:'地形 (仮)',en:'Terrain (placeholder)',c:[.1,.4,.5],k:1}],...Object.entries(CTXL).filter(([k])=>LIVE?LIVE_LAYERS.includes(k):layerObjs[k])];
  let saved={};try{saved=JSON.parse(localStorage.getItem('shinkaviz-layers')||'{}');}catch(e){}
- const apply=(k,on)=>{if(k==='terrain'){contourObj.visible=on;npL.visible=on;}else layerObjs[k].o.visible=on;};
+ const apply=(k,on)=>{if(k==='terrain'){contourObj.visible=on;npL.visible=on;LTM.on.terrain=on;}else if(LIVE)LTM.on[k]=on;else layerObjs[k].o.visible=on;LTM.last=0;};
  for(const [k,L] of items){const lab=document.createElement('label'),cb=document.createElement('input'),sw=document.createElement('i'),tx=document.createElement('span');
   cb.type='checkbox';cb.checked=saved[k]!==false;cb.addEventListener('change',()=>{apply(k,cb.checked);saved[k]=cb.checked;try{localStorage.setItem('shinkaviz-layers',JSON.stringify(saved));}catch(e){}});
   const c=L.c.map(v=>Math.round(Math.min(1,v*1.4)*255));sw.style.background=`rgb(${c})`;tx.textContent=`${L.ja} ${L.en}`;lab.append(cb,sw,tx);box.appendChild(lab);apply(k,cb.checked);}}
-$('#src').textContent=SRC_NOTE;$('#credit').hidden=!LINE;resize();msg.remove();requestAnimationFrame(frame);
+$('#src').textContent=SRC_NOTE;$('#procNote').hidden=!!LIVE;$('#liveNote').hidden=!LIVE;$('#credit').hidden=!LINE;if(LIVE)$('#credit').textContent='Map data © OpenStreetMap contributors · OpenFreeMap © OpenMapTiles · Terrain Tiles (Mapzen, AWS Open Data).';resize();msg.remove();requestAnimationFrame(frame);
 }
 }
 </script>
