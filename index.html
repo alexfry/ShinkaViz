@@ -660,7 +660,7 @@ function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSiz
 function pass(m,rt){quad.material=m;renderer.setRenderTarget(rt);renderer.render(qScene,qCam);}
 
 /* ---------- camera: one continuous orbit (chase <-> overview) and a cinematic director ---------- */
-let mode='orbit',speed=1,anim=null,ovf=0;
+let mode='cine',speed=1,anim=null,ovf=0;
 const ORB={yaw:.55,pitch:.12,dist:40,min:12,max:2500000};
 const T=new THREE.Vector3(),hs0={s:0,v:0,stop:-1,i:0};
 let FT=hero,fs=hs0,FP0=HP0,lastHd=null;const FSX={s:0,v:0,stop:-1,i:0};
