@@ -69,7 +69,7 @@ def server_status(url):
     """Overpass /api/status: free query slots and rate limit. Not every mirror has it."""
     try:
         req = urllib.request.Request(url.replace("/interpreter", "/status"), headers=UA)
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(req, timeout=3) as r:
             lines = r.read(4000).decode("utf-8", "replace").splitlines()
         keys = ("Rate limit", "slots available", "Slot available after", "Currently running")
         shown = [l.strip() for l in lines if any(k in l for k in keys)]
@@ -83,7 +83,7 @@ def overpass(query, label):
     body = urllib.parse.urlencode({"data": query}).encode()
     last = None
     for attempt in range(3):
-        for url in MIRRORS:
+        for url in list(MIRRORS):
             host = urllib.parse.urlparse(url).netloc
             log(f"[{label}] {host}, round {attempt + 1}/3")
             log(f"    server: {server_status(url)}")
@@ -105,6 +105,8 @@ def overpass(query, label):
                     raise RuntimeError(remark)
                 n = len(data.get("elements", []))
                 log(f"    received {tick.bytes / 1024:.0f} KB, {n} elements in {tick.elapsed():.1f}s")
+                MIRRORS.remove(url)
+                MIRRORS.insert(0, url)  # stick with the server that last worked
                 return data
             except urllib.error.HTTPError as e:
                 detail = e.read(300).decode("utf-8", "replace").strip().replace("\n", " ")
