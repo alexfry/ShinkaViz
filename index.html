@@ -88,7 +88,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 <div id="msg">Building scene…</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="data/sanyo-line.js"></script>
-<script src="data/sanyo-context.js"></script>
+<script src="data/lines/index.js"></script>
 <script src="data/sanyo-timetable.js"></script>
 <script>
 {
@@ -108,24 +108,46 @@ let RTT=THREE.UnsignedByteType,SCALE=1/8;
 if(GL2?(ex('EXT_color_buffer_float')||ex('EXT_color_buffer_half_float')):(ex('OES_texture_half_float')&&ex('OES_texture_half_float_linear')&&ex('EXT_color_buffer_half_float'))){RTT=THREE.HalfFloatType;SCALE=1;}
 const DEPTHTEX=GL2||!!ex('WEBGL_depth_texture');
 
-/* ---------- geography ---------- */
+/* ---------- geography: the Shinkansen network ----------
+   Lines come from data/lines/<id>.js (tools/build_network.py, from OpenStreetMap), listed in data/lines/index.js. They share one
+   sample spacing and are packed end to end into one set of arrays; BRK marks the first sample of each line, LINES[li].i0 its offset.
+   A chainage S is metres into those packed arrays. Projection: Lambert conformal conic for Japan (tools/geo.py), metres, x east, z south. */
+const LCC=(()=>{const R=6371008.8,d=Math.PI/180,p1=33*d,p2=41*d,f0=37*d,l0=137*d,t=p=>Math.tan(Math.PI/4+p/2),n=Math.log(Math.cos(p1)/Math.cos(p2))/Math.log(t(p2)/t(p1)),F=Math.cos(p1)*Math.pow(t(p1),n)/n,r0=R*F/Math.pow(t(f0),n);
+ return{fwd:(lon,lat)=>{const r=R*F/Math.pow(t(lat*d),n),th=n*(lon*d-l0);return[r*Math.sin(th),-(r0-r*Math.cos(th))];},
+  inv:(x,z)=>{const y=-z,r=Math.sign(n)*Math.hypot(x,r0-y),th=Math.atan2(x,r0-y);return[(l0+th/n)/d,(2*Math.atan(Math.pow(R*F/r,1/n))-Math.PI/2)/d];}};})();
+const llToXZ=(lon,lat)=>LCC.fwd(lon,lat),xzToLL=(X,Z)=>LCC.inv(X,Z);
+const MAJOR=new Set(['東京','品川','新横浜','名古屋','京都','新大阪','新神戸','岡山','広島','小倉','博多','熊本','鹿児島中央','長崎','大宮','仙台','福島','盛岡','新青森','新函館北斗','高崎','新潟','長野','金沢','福井','敦賀','山形','秋田']);
+/* Sanyo stations, for the fallback when no line data is present */
 const STN=[["Shin-Osaka",34.7334,135.5002,1,"新大阪"],["Shin-Kobe",34.7066,135.1955,1,"新神戸"],["Nishi-Akashi",34.6652,134.9603,0,"西明石"],["Himeji",34.8270,134.6906,1,"姫路"],["Aioi",34.8064,134.4685,0,"相生"],["Okayama",34.6665,133.9180,1,"岡山"],["Shin-Kurashiki",34.5833,133.6866,0,"新倉敷"],["Fukuyama",34.4893,133.3624,1,"福山"],["Shin-Onomichi",34.4371,133.1884,0,"新尾道"],["Mihara",34.4001,133.0791,0,"三原"],["Higashi-Hiroshima",34.3917,132.7594,0,"東広島"],["Hiroshima",34.3976,132.4752,1,"広島"],["Shin-Iwakuni",34.1653,132.1417,0,"新岩国"],["Tokuyama",34.0518,131.8053,0,"徳山"],["Shin-Yamaguchi",34.0929,131.3960,1,"新山口"],["Asa",34.0512,131.1738,0,"厚狭"],["Shin-Shimonoseki",34.0082,130.9496,0,"新下関"],["Kokura",33.8868,130.8826,1,"小倉"],["Hakata",33.5897,130.4207,1,"博多"]];
-const LAT0=34.2,LON0=133.0,KX=111320*Math.cos(LAT0*Math.PI/180),KZ=110574;
-const stations=STN.map(([name,lat,lon,major,ja])=>({name,ja,major:!!major,x:(lon-LON0)*KX,z:-(lat-LAT0)*KZ}));
+const loadScript=src=>new Promise(res=>{const e=document.createElement('script');e.src=src;e.onload=e.onerror=()=>res();document.head.appendChild(e);});
+let SRC_LINES=[],LINE_SRC='osm';
+if(window.SHINKA_NET&&window.SHINKA_NET.proj==='lcc-jp-1'){msg.textContent='Loading lines…';const NL=window.SHINKA_NET.lines;await Promise.all(NL.map(l=>loadScript(`data/lines/${l.id}.js`)));
+ SRC_LINES=NL.map(l=>window.SHINKA_LINES&&window.SHINKA_LINES[l.id]).filter(l=>l&&l.proj==='lcc-jp-1'&&l.xz.length>8);}
+/* fallbacks: the older Sanyo-only file (local projection, converted here), then a curve through the Sanyo stations */
+if(!SRC_LINES.length&&window.SANYO_LINE&&window.SANYO_LINE.origin[0]===34.2&&window.SANYO_LINE.origin[1]===133){const SL=window.SANYO_LINE,KX0=111320*Math.cos(34.2*Math.PI/180),xz=[];
+ for(let i=0;i<SL.xz.length;i+=2){const p=llToXZ(SL.xz[i]/KX0+133,-SL.xz[i+1]/110574+34.2);xz.push(p[0],p[1]);}
+ SRC_LINES=[{id:'sanyo',ja:'山陽新幹線',en:'Sanyo Shinkansen',step:SL.step,xz,flags:SL.flags,stations:SL.stations.map(x=>({ja:x.ja,en:(STN.find(r=>r[4]===x.ja)||[x.en])[0],s:x.s}))}];}
+if(!SRC_LINES.length){LINE_SRC='curve';const pts=STN.map(r=>{const p=llToXZ(r[2],r[1]);return new THREE.Vector3(p[0],0,p[1]);}),curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');curve.arcLengthDivisions=40000;
+ const L=curve.getLength(),n=Math.round(L/50),raw=curve.getSpacedPoints(n),xz=[];for(const p of raw)xz.push(p.x,p.z);
+ const st=STN.map(r=>{const p=llToXZ(r[2],r[1]);let b=0,bd=1e30;for(let i=0;i<raw.length;i++){const d=(raw[i].x-p[0])**2+(raw[i].z-p[1])**2;if(d<bd){bd=d;b=i;}}return{ja:r[4],en:r[0],s:b*L/n};});
+ SRC_LINES=[{id:'sanyo',ja:'山陽新幹線',en:'Sanyo Shinkansen',step:L/n,xz,flags:'',stations:st,curve:true}];}
+const DS=SRC_LINES[0].step||50,LINES=[];let N=-1;
+for(const L of SRC_LINES){const n=L.xz.length/2;LINES.push({id:L.id,ja:L.ja,en:L.en,mini:!!L.mini,i0:N+1,n:n-1,src:L});N+=n;}
+const LEN=N*DS;
+const PX=new Float64Array(N+1),PZ=new Float64Array(N+1),PY=new Float64Array(N+1),TX=new Float64Array(N+1),TZ=new Float64Array(N+1),TUN=new Uint8Array(N+1),BRG=new Uint8Array(N+1),BRK=new Uint8Array(N+1),LOF=new Uint16Array(N+1);
+for(const [li,L] of LINES.entries()){const x=L.src.xz,f=L.src.flags||'';BRK[L.i0]=1;
+ for(let j=0;j<=L.n;j++){const i=L.i0+j;PX[i]=x[2*j];PZ[i]=x[2*j+1];LOF[i]=li;TUN[i]=f[j]==='1'?1:0;BRG[i]=f[j]==='2'?1:0;}
+ for(let j=0;j<=L.n;j++){const a=L.i0+Math.max(0,j-1),b=L.i0+Math.min(L.n,j+1),tx=PX[b]-PX[a],tz=PZ[b]-PZ[a],l=Math.hypot(tx,tz)||1;TX[L.i0+j]=tx/l;TZ[L.i0+j]=tz/l;}
+ L.S0=L.i0*DS;L.S1=(L.i0+L.n)*DS;}
+/* stations, one per name across all lines; ON[k] lists where station k sits on each line */
+const stations=[],KJ=new Map();
+for(const [li,L] of LINES.entries()){L.st=[];for(const x of L.src.stations){let k=KJ.get(x.ja);if(k===undefined){k=stations.length;KJ.set(x.ja,k);stations.push({name:x.en,ja:x.ja,major:MAJOR.has(x.ja),on:[]});}
+ const S=L.S0+Math.min(x.s,L.n*DS);stations[k].on.push({li,S});L.st.push({k,S});}}
 const NS=stations.length;
-/* Track: OpenStreetMap centreline from data/sanyo-line.js (build_line.py); falls back to a curve through the stations. */
-const LINE=window.SANYO_LINE&&window.SANYO_LINE.origin[0]===LAT0&&window.SANYO_LINE.origin[1]===LON0&&STN.every(r=>window.SANYO_LINE.stations.some(x=>x.ja===r[4]))?window.SANYO_LINE:null;
-const CTX=window.SANYO_CONTEXT&&window.SANYO_CONTEXT.origin[0]===LAT0&&window.SANYO_CONTEXT.origin[1]===LON0?window.SANYO_CONTEXT:null;
-let N,DS,LEN,SRC_X,SRC_Z;
-if(LINE){N=LINE.xz.length/2-1;DS=LINE.step;LEN=N*DS;SRC_X=i=>LINE.xz[2*i];SRC_Z=i=>LINE.xz[2*i+1];}
-else{const curve=new THREE.CatmullRomCurve3(stations.map(s=>new THREE.Vector3(s.x,0,s.z)),false,'centripetal');curve.arcLengthDivisions=40000;LEN=curve.getLength();N=Math.round(LEN/50);DS=LEN/N;const raw=curve.getSpacedPoints(N);SRC_X=i=>raw[i].x;SRC_Z=i=>raw[i].z;}
-const PX=new Float64Array(N+1),PZ=new Float64Array(N+1),PY=new Float64Array(N+1),TX=new Float64Array(N+1),TZ=new Float64Array(N+1),TUN=new Uint8Array(N+1),BRG=new Uint8Array(N+1);
-for(let i=0;i<=N;i++){PX[i]=SRC_X(i);PZ[i]=SRC_Z(i);}
-for(let i=0;i<=N;i++){const a=Math.max(0,i-1),b=Math.min(N,i+1);const tx=PX[b]-PX[a],tz=PZ[b]-PZ[a],l=Math.hypot(tx,tz)||1;TX[i]=tx/l;TZ[i]=tz/l;}
-const SC=LINE?stations.map(s=>LINE.stations.find(x=>x.ja===s.ja).s):stations.map(s=>{let b=0,bd=1e30;for(let i=0;i<=N;i++){const d=(PX[i]-s.x)*(PX[i]-s.x)+(PZ[i]-s.z)*(PZ[i]-s.z);if(d<bd){bd=d;b=i;}}return b*DS;});
-if(LINE)stations.forEach((s,k)=>{const i=Math.min(N,Math.round(SC[k]/DS));s.x=PX[i];s.z=PZ[i];});
-const PC=SC.map(s=>Math.min(Math.max(s,260),LEN-260));
-
+/* each station's main position: the line where it has the most track either side (for platforms, labels and cameras) */
+const PC=stations.map(st=>{const o=st.on.reduce((a,b)=>{const r=x=>Math.min(x.S-LINES[x.li].S0,LINES[x.li].S1-x.S);return r(b)>r(a)?b:a;});st.li=o.li;const L=LINES[o.li];return Math.min(Math.max(o.S,L.S0+260),L.S1-260);});
+stations.forEach((s,k)=>{const i=Math.round(PC[k]/DS);s.x=PX[i];s.z=PZ[i];});
+const CTX=null;
 /* ---------- live map tiles: OpenFreeMap vector tiles (OpenMapTiles schema) + AWS Terrain Tiles (Terrarium) ----------
    Used when the page can reach them (served locally or from your own host). Add #offline to the URL to force the built-in data. */
 let LIVE=null;
@@ -133,9 +155,8 @@ if(!/offline/.test(location.hash)){try{msg.textContent='Connecting to map tiles�
  const r=await fetch('https://tiles.openfreemap.org/planet',{signal:ac.signal});clearTimeout(to);const j=await r.json();
  if(j.tiles&&j.tiles[0])LIVE={vt:j.tiles[0],vmax:Math.min(14,j.maxzoom||14),tt:'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'};}catch(e){console.info('Live tiles unavailable, using built-in data.',e&&e.message);}}
 const R2D=180/Math.PI;
-const xzToLL=(X,Z)=>[X/KX+LON0,-Z/KZ+LAT0];
 function llToTile(lon,lat,z){const n=2**z,s=Math.sin(lat/R2D);return [(lon+180)/360*n,(1-Math.log((1+s)/(1-s))/(2*Math.PI))/2*n];}
-function tileXZ(z,x,y,fx,fy){const n=2**z,lon=(x+fx)/n*360-180,lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+fy)/n)))*R2D;return [(lon-LON0)*KX,-(lat-LAT0)*KZ];}
+function tileXZ(z,x,y,fx,fy){const n=2**z,lon=(x+fx)/n*360-180,lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+fy)/n)))*R2D;return llToXZ(lon,lat);}
 /* terrain cache: key -> Float32Array(256*256) of metres (or 'loading' / 'fail') */
 const TC=new Map();
 function loadTerrain(key){if(TC.has(key))return TC.get(key).p||Promise.resolve();const [z,x,y]=key.split('/').map(Number),e={st:'loading'};TC.set(key,e);
@@ -155,31 +176,58 @@ const SXZ=stations.map(s=>[s.x,s.z]).sort((a,b)=>a[0]-b[0]);
 function zAt(x){if(x<=SXZ[0][0])return SXZ[0][1];for(let i=1;i<SXZ.length;i++)if(x<=SXZ[i][0]){const t=(x-SXZ[i-1][0])/(SXZ[i][0]-SXZ[i-1][0]);return SXZ[i-1][1]+t*(SXZ[i][1]-SXZ[i-1][1]);}return SXZ[SXZ.length-1][1];}
 function Hx(x,z,zt){const n=(zt-z)/1000;let h=110+7*n+(fbm(x/21000+3.7,z/21000+9.1)-.47)*640;if(n<-2.5)h-=(-n-2.5)*28;return h;}
 const hs=new Float64Array(N+1);for(let i=0;i<=N;i++)hs[i]=Hx(PX[i],PZ[i],zAt(PX[i]));
-{const W=60,pre=new Float64Array(N+2);for(let i=0;i<=N;i++)pre[i+1]=pre[i]+hs[i];
- for(let i=0;i<=N;i++){const a=Math.max(0,i-W),b=Math.min(N,i+W);PY[i]=Math.max((pre[b+1]-pre[a])/(b-a+1),4)+9;}
- if(LINE)for(let i=0;i<=N;i++){const f=LINE.flags[i];TUN[i]=f==='1'?1:0;BRG[i]=f==='2'?1:0;}
- else{for(let i=0;i<=N;i++)TUN[i]=hs[i]>PY[i]+4?1:0;for(let k=0;k<NS;k++){const c=Math.round(PC[k]/DS);for(let i=Math.max(0,c-16);i<=Math.min(N,c+16);i++)TUN[i]=0;}}}
+/* box-smooth an array within each line (never across the joins between lines) */
+function smoothLines(A,W,out){for(const L of LINES){const a0=L.i0,a1=L.i0+L.n,pre=new Float64Array(L.n+2);for(let i=a0;i<=a1;i++)pre[i-a0+1]=pre[i-a0]+A[i];
+ for(let i=a0;i<=a1;i++){const a=Math.max(a0,i-W),b=Math.min(a1,i+W);out[i]=(pre[b-a0+1]-pre[a-a0])/(b-a+1);}}return out;}
+smoothLines(hs,60,PY);for(let i=0;i<=N;i++)PY[i]=Math.max(PY[i],4)+9;
+if(LINE_SRC==='curve'){for(let i=0;i<=N;i++)TUN[i]=hs[i]>PY[i]+4?1:0;for(let k=0;k<NS;k++){const c=Math.round(PC[k]/DS);for(let i=Math.max(0,c-16);i<=Math.min(N,c+16);i++)TUN[i]=0;}}
 /* live: real ground along the line (z10 elevation tiles); viaducts at deck height, embankments low, tunnels interpolated between their portals */
-if(LIVE){msg.textContent='Loading terrain along the line…';const need=new Set();
+if(LIVE){msg.textContent='Loading terrain along the lines…';const need=new Set();
  for(let i=0;i<=N;i+=10){const [lo,la]=xzToLL(PX[i],PZ[i]),[tx,ty]=llToTile(lo,la,10);need.add(`10/${tx|0}/${ty|0}`);}
  await Promise.all([...need].map(loadTerrain));let got=0;
  for(let i=0;i<=N;i++){const h=heightAt(PX[i],PZ[i]);if(h!==null){hs[i]=Math.max(h,0);got++;}}
- if(got>N*.9){const g=new Float64Array(N+1);for(let i=0;i<=N;i++){let a=0,c=0;for(let k=Math.max(0,i-4);k<=Math.min(N,i+4);k++){a+=hs[k];c++;}g[i]=a/c;}
+ if(got>N*.9){const g=smoothLines(hs,4,new Float64Array(N+1));
   for(let i=0;i<=N;i++)PY[i]=g[i]+(BRG[i]?10:2.5);
-  for(let i=0;i<=N;){if(!TUN[i]){i++;continue;}let j=i;while(j<=N&&TUN[j])j++;const a=PY[Math.max(0,i-1)],b=PY[Math.min(N,j)];for(let k=i;k<j;k++)PY[k]=a+(b-a)*(k-i+1)/(j-i+1);i=j;}
-  const q=Float64Array.from(PY);for(let i=0;i<=N;i++){let a=0,c=0;for(let k=Math.max(0,i-10);k<=Math.min(N,i+10);k++){a+=q[k];c++;}PY[i]=Math.max(a/c,1);}}
+  for(const L of LINES){const a0=L.i0,a1=L.i0+L.n;for(let i=a0;i<=a1;){if(!TUN[i]){i++;continue;}let j=i;while(j<=a1&&TUN[j])j++;const a=PY[Math.max(a0,i-1)],b=PY[Math.min(a1,j)];for(let k=i;k<j;k++)PY[k]=a+(b-a)*(k-i+1)/(j-i+1);i=j;}}
+  smoothLines(Float64Array.from(PY),10,PY);for(let i=0;i<=N;i++)PY[i]=Math.max(PY[i],1);}
  else{console.warn('Terrain tiles did not load; keeping the procedural profile.');}}
 
 /* ---------- track helpers ---------- */
 const TP={x:0,y:0,z:0,tx:1,tz:0,i:0};
-function trk(s){s=s<0?0:s>LEN-1e-3?LEN-1e-3:s;const f=s/DS;let i=f|0;if(i>=N)i=N-1;const u=f-i,o=TP;
+function trk(s){s=s<0?0:s>LEN-1e-3?LEN-1e-3:s;const f=s/DS;let i=f|0,u;if(i>=N)i=N-1;u=f-i;if(BRK[i+1]){i--;u=1;}const o=TP;
  o.x=PX[i]+(PX[i+1]-PX[i])*u;o.y=PY[i]+(PY[i+1]-PY[i])*u;o.z=PZ[i]+(PZ[i+1]-PZ[i])*u;
  const tx=TX[i]+(TX[i+1]-TX[i])*u,tz=TZ[i]+(TZ[i+1]-TZ[i])*u,l=Math.hypot(tx,tz)||1;o.tx=tx/l;o.tz=tz/l;o.i=u<.5?i:i+1;return o;}
 function at(s,off,out){const o=trk(s);out[0]=o.x+o.tz*off;out[1]=o.y;out[2]=o.z-o.tx*off;return out;}
 const sp=(i,off)=>[PX[i]+TZ[i]*off,PY[i],PZ[i]-TX[i]*off];
-function tunAt(s){const f=Math.min(Math.max(s,0),LEN-1e-3)/DS,i=Math.min(N-1,f|0),u=f-i;return TUN[i]+(TUN[i+1]-TUN[i])*u;}
+function tunAt(s){const f=Math.min(Math.max(s,0),LEN-1e-3)/DS;let i=Math.min(N-1,f|0),u=f-i;if(BRK[i+1]){i--;u=1;}return TUN[i]+(TUN[i+1]-TUN[i])*u;}
 function loopAmt(d){if(d<230)return 1;if(d<600){const t=1-(d-230)/370;return t*t*(3-2*t);}return 0;}
 function nearestK(s){let b=0,bd=1e30;for(let k=0;k<NS;k++){const d=Math.abs(s-PC[k]);if(d<bd){bd=d;b=k;}}return b;}
+
+/* ---------- routes: a train's path through the network ----------
+   Stations next to each other on a line are joined; a train's stops are linked by the shortest path, then grouped into legs
+   (runs along one line). A train's position u is metres along its own route, so it always moves forwards (u grows), whatever
+   way each line is drawn. rS maps u to the packed chainage S and the leg's sign. */
+const ADJ=stations.map(()=>[]);
+for(const [li,L] of LINES.entries())for(let j=0;j+1<L.st.length;j++){const a=L.st[j],b=L.st[j+1];ADJ[a.k].push({k:b.k,li,sa:a.S,sb:b.S});ADJ[b.k].push({k:a.k,li,sa:b.S,sb:a.S});}
+function hops(ka,kb){if(ka===kb)return[];const D=new Float64Array(NS).fill(1e30),P=new Array(NS),Q=new Set([ka]);D[ka]=0;
+ while(Q.size){let k=-1,b=1e30;for(const q of Q)if(D[q]<b){b=D[q];k=q;}Q.delete(k);if(k===kb)break;
+  for(const e of ADJ[k]){const d=D[k]+Math.abs(e.sb-e.sa);if(d<D[e.k]){D[e.k]=d;P[e.k]={from:k,e};Q.add(e.k);}}}
+ if(D[kb]>=1e30)return null;const out=[];for(let k=kb;k!==ka;k=P[k].from)out.unshift(P[k].e);return out;}
+function makeRoute(ks){const H=[];for(let j=0;j+1<ks.length;j++){const h=hops(ks[j],ks[j+1]);if(!h)return null;H.push(...h);}if(!H.length)return null;
+ const legs=[];for(const h of H){const sg=Math.sign(h.sb-h.sa)||1,l=legs[legs.length-1];if(l&&l.li===h.li&&l.sg===sg)l.b=h.sb;else legs.push({li:h.li,a:h.sa,b:h.sb,sg});}
+ /* run on up to 400 m past the first and last stops, so a whole train fits at its terminal platforms */
+ const f=legs[0],e=legs[legs.length-1],Lf=LINES[f.li],Le=LINES[e.li];f.a=Math.min(Math.max(f.a-f.sg*400,Lf.S0),Lf.S1);e.b=Math.min(Math.max(e.b+e.sg*400,Le.S0),Le.S1);
+ let u=0;for(const l of legs){l.u0=u;u+=Math.abs(l.b-l.a);}
+ const uK=new Map(),uList=[];for(const l of legs)for(const st of LINES[l.li].st){const d=(st.S-l.a)*l.sg;if(d>=-1&&d<=Math.abs(l.b-l.a)+1&&!uK.has(st.k)){uK.set(st.k,l.u0+d);uList.push([l.u0+d,st.k]);}}
+ uList.sort((a,b)=>a[0]-b[0]);return{legs,U:u,uK,uList};}
+const RS={S:0,sg:1,li:0};
+function rS(tr,u){const L=tr.R.legs;let l=L[0];for(let j=1;j<L.length&&u>=L[j].u0;j++)l=L[j];const Ln=LINES[l.li];RS.S=Math.min(Math.max(l.a+l.sg*(u-l.u0),Ln.S0),Ln.S1);RS.sg=l.sg;RS.li=l.li;return RS;}
+/* the train-route versions of trk / at / tunAt: tangent points along the direction of travel, positive offset is to the left of it */
+function trkT(tr,u){const r=rS(tr,u),o=trk(r.S);if(r.sg<0){o.tx=-o.tx;o.tz=-o.tz;}return o;}
+function atT(tr,u,off,out){const r=rS(tr,u);return at(r.S,off*r.sg,out);}
+const tunT=(tr,u)=>tunAt(rS(tr,u).S);
+/* the station nearest a point of a train's route, and how far away it is */
+function nearRouteK(tr,u){let b=-1,bd=1e30;for(const [v,k] of tr.R.uList){const d=Math.abs(v-u);if(d<bd){bd=d;b=k;}}return [b,bd];}
 
 /* ---------- materials ---------- */
 const U={uScale:{value:SCALE},uTime:{value:0},uFadeNear:{value:25000},uFadeFar:{value:110000}};
@@ -194,14 +242,21 @@ function lineMat(o={}){return new THREE.ShaderMaterial({uniforms:{uScale:U.uScal
 class Seg{constructor(){this.p=[];this.c=[];}
  add(a,b,c){this.p.push(a[0],a[1],a[2],b[0],b[1],b[2]);this.c.push(c[0],c[1],c[2],c[0],c[1],c[2]);}
  add2(a,b,c,d){this.p.push(a[0],a[1],a[2],b[0],b[1],b[2]);this.c.push(c[0],c[1],c[2],d[0],d[1],d[2]);}
- mesh(mat,layer){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(this.p,3));g.setAttribute('col',new THREE.Float32BufferAttribute(this.c,3));const l=new THREE.LineSegments(g,mat);l.frustumCulled=false;l.layers.set(layer||0);return l;}}
+ /* geometry is stored relative to each chunk's centre (the object's position), so float32 vertices stay precise anywhere in Japan */
+ mesh(mat,layer){const n=this.p.length/6,one=(idx)=>{let x0=1e30,x1=-1e30,y0=1e30,y1=-1e30,z0=1e30,z1=-1e30;for(const i of idx){for(const o of[0,3]){const x=this.p[i*6+o],y=this.p[i*6+o+1],z=this.p[i*6+o+2];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(z<z0)z0=z;if(z>z1)z1=z;}}
+   const cx=(x0+x1)/2,cy=(y0+y1)/2,cz=(z0+z1)/2,P=new Float32Array(idx.length*6),C=new Float32Array(idx.length*6);let j=0;
+   for(const i of idx){for(let o=0;o<6;o+=3){P[j]=this.p[i*6+o]-cx;P[j+1]=this.p[i*6+o+1]-cy;P[j+2]=this.p[i*6+o+2]-cz;C[j]=this.c[i*6+o];C[j+1]=this.c[i*6+o+1];C[j+2]=this.c[i*6+o+2];j+=3;}}
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('col',new THREE.BufferAttribute(C,3));const l=new THREE.LineSegments(g,mat);l.position.set(cx,cy,cz);l.frustumCulled=false;l.layers.set(layer||0);return l;};
+  if(n<=20000){const idx=new Array(n);for(let i=0;i<n;i++)idx[i]=i;return one(idx);}
+  const B=new Map();for(let i=0;i<n;i++){const k=Math.floor((this.p[i*6]+this.p[i*6+3])/40000)+','+Math.floor((this.p[i*6+2]+this.p[i*6+5])/40000);let a=B.get(k);if(!a)B.set(k,a=[]);a.push(i);}
+  const G=new THREE.Group();for(const idx of B.values())G.add(one(idx));G.layers.set(layer||0);return G;}}
 const mul=(c,k)=>[c[0]*k,c[1]*k,c[2]*k];
 const scene=new THREE.Scene();
 const trackMat=lineMat(),wireMat=lineMat(),stationMat=lineMat(),contourMat=lineMat({flick:.3}),patchMat=lineMat({radius:3000});
 
 /* ---------- static network ---------- */
 const TRK=[.16,.62,1.0],RAIL=[.6,1.5,2.4],sT=new Seg(),sW=new Seg(),sS=new Seg(),sC=new Seg();
-for(const dr of[1,-1])for(const g of[-.75,.75]){const off=dr*2.15+g;let p=sp(0,off);for(let i=1;i<=N;i++){const q=sp(i,off);sT.add(p,q,(TUN[i]||TUN[i-1])?mul(TRK,.3):RAIL);p=q;}}
+for(const dr of[1,-1])for(const g of[-.75,.75]){const off=dr*2.15+g;let p=sp(0,off);for(let i=1;i<=N;i++){const q=sp(i,off);if(!BRK[i])sT.add(p,q,(TUN[i]||TUN[i-1])?mul(TRK,.3):RAIL);p=q;}}
 for(let k=0;k<NS;k++)for(const dr of[1,-1])for(const e of stations[k].major?[5,14]:[5])for(const g of[-.75,.75]){let p=null,pa=0;for(let s=PC[k]-620;s<=PC[k]+620;s+=20){const a=loopAmt(Math.abs(s-PC[k])),q=at(s,dr*(2.15+e*a)+g,[0,0,0]);if(p&&(a>.002||pa>.002))sT.add(p,q,mul(RAIL,.85));p=q;pa=a;}}
 const PLAT=[.5,.56,.65];
 for(let k=0;k<NS;k++){for(const dr of[1,-1]){const o1=8.9,o2=stations[k].major?14.4:12.9,a0=PC[k]-215,a1=PC[k]+215;
@@ -210,11 +265,11 @@ for(let k=0;k<NS;k++){for(const dr of[1,-1]){const o1=8.9,o2=stations[k].major?1
   const om=(o1+o2)/2,CAN=mul(PLAT,.3);for(let s=a0+10;s<=a1;s+=20){const b=at(s,dr*om,[0,0,0]);sS.add([b[0],b[1]+1.25,b[2]],[b[0],b[1]+5.2,b[2]],CAN);const l=at(s,dr*o1,[0,0,0]),r=at(s,dr*o2,[0,0,0]);l[1]+=5.2;r[1]+=5.2;sS.add(l,r,CAN);}}
  const b=at(PC[k],0,[0,0,0]);sS.add2(b,[b[0],b[1]+120,b[2]],[1.1,1.3,1.8],[0,.02,.05]);}
 const WIRE=[.05,.2,.32],POLE=[.035,.13,.22];
-for(const dr of[1,-1]){let p=sp(0,dr*2.15);p[1]+=5;for(let i=1;i<=N;i++){const q=sp(i,dr*2.15);q[1]+=5;sW.add(p,q,TUN[i]?mul(WIRE,.3):WIRE);p=q;}}
+for(const dr of[1,-1]){let p=sp(0,dr*2.15);p[1]+=5;for(let i=1;i<=N;i++){const q=sp(i,dr*2.15);q[1]+=5;if(!BRK[i])sW.add(p,q,TUN[i]?mul(WIRE,.3):WIRE);p=q;}}
 for(let i=0;i<=N;i++){if(TUN[i])continue;const s=i*DS;if(Math.abs(s-PC[nearestK(s)])<640)continue;for(const dr of[1,-1]){const b=sp(i,dr*5.3);sW.add(b,[b[0],b[1]+7.2,b[2]],POLE);const e=sp(i,dr*1.2);e[1]+=6.6;sW.add([b[0],b[1]+6.6,b[2]],e,POLE);}}
 let minX=1e30,maxX=-1e30,minZ=1e30,maxZ=-1e30;for(let i=0;i<=N;i++){minX=Math.min(minX,PX[i]);maxX=Math.max(maxX,PX[i]);minZ=Math.min(minZ,PZ[i]);maxZ=Math.max(maxZ,PZ[i]);}
 const CX=(minX+maxX)/2,CZ=(minZ+maxZ)/2;
-if(!LIVE){const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/G)+1,nz=Math.ceil((maxZ+50000-z0)/G)+1,h=new Float32Array(nx*nz);
+if(!LIVE&&Math.max(maxX-minX,maxZ-minZ)<900000){const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/G)+1,nz=Math.ceil((maxZ+50000-z0)/G)+1,h=new Float32Array(nx*nz);
  for(let i=0;i<nx;i++){const x=x0+i*G,zt=zAt(x);for(let j=0;j<nz;j++)h[j*nx+i]=Hx(x,z0+j*G,zt);}
  const MS=[[],[3,0],[0,1],[3,1],[1,2],[3,0,1,2],[0,2],[3,2],[2,3],[0,2],[0,1,2,3],[1,2],[1,3],[0,1],[0,3],[]];
  for(let L=CTX&&CTX.layers.coast&&CTX.layers.coast.length?100:0;L<=1000;L+=100){const col=L===0?[.08,.34,.44]:mul([.045,.13,.17],.6+L/1000);
@@ -224,16 +279,16 @@ if(!LIVE){const G=1000,x0=minX-40000,z0=minZ-80000,nx=Math.ceil((maxX+40000-x0)/
    const m=MS[k];for(let q=0;q<m.length;q+=2)sC.add(e(m[q]),e(m[q+1]),col);}}}
 /* viaducts (OSM bridge flags) and tunnel portals */
 const DECK=[.06,.22,.36],PIER=[.04,.15,.26],PORT=[.3,.7,1.0];
-for(const dr of[1,-1])for(const [o,dy] of[[5.6,-.3],[5.6,1.3]]){let p=null;for(let i=0;i<=N;i++){if(!BRG[i]){p=null;continue;}const q=sp(i,dr*o);q[1]+=dy;if(p)sW.add(p,q,DECK);p=q;}}
+for(const dr of[1,-1])for(const [o,dy] of[[5.6,-.3],[5.6,1.3]]){let p=null;for(let i=0;i<=N;i++){if(!BRG[i]||BRK[i]){p=null;if(!BRG[i])continue;}const q=sp(i,dr*o);q[1]+=dy;if(p)sW.add(p,q,DECK);p=q;}}
 for(let i=0;i<=N;i++){if(!BRG[i]||TUN[i])continue;const g=Math.max(hs[i],0),top=PY[i]-1.2;if(top-g<3)continue;
  const l=sp(i,-5.6),r=sp(i,5.6);l[1]=r[1]=top;sW.add(l,r,PIER);for(const o of[-2.6,2.6]){const a=sp(i,o);a[1]=top;sW.add(a,[a[0],g,a[2]],PIER);}}
-for(let i=1;i<=N;i++){if(TUN[i]===TUN[i-1])continue;const j=TUN[i]?i:i-1;let p=null;
+for(let i=1;i<=N;i++){if(BRK[i]||TUN[i]===TUN[i-1])continue;const j=TUN[i]?i:i-1;let p=null;
  for(let k=0;k<=24;k++){const t=k/24;let u,v;if(t<.2){u=-4.8;v=t/.2*3.5;}else if(t>.8){u=4.8;v=(1-t)/.2*3.5;}else{const an=Math.PI*(1-(t-.2)/.6);u=4.8*Math.cos(an);v=3.5+4.8*Math.sin(an);}
   const q=sp(j,u);q[1]+=v-.5;if(p)sS.add(p,q,mul(PORT,1.2));p=q;}}
 /* tunnel bores: an arch ring every 50 m plus crown, shoulder and wall-foot lines, so tunnels read from inside and out */
 const sTun=new Seg(),TUNC=[.12,.32,.5],arch=(t)=>{if(t<.2)return [-4.8,t/.2*3.5];if(t>.8)return [4.8,(1-t)/.2*3.5];const an=Math.PI*(1-(t-.2)/.6);return [4.8*Math.cos(an),3.5+4.8*Math.sin(an)];};
 for(let i=0;i<=N;i++){if(!TUN[i])continue;let p=null;for(let k=0;k<=16;k++){const [u,v]=arch(k/16),q=sp(i,u);q[1]+=v-.5;if(p)sTun.add(p,q,TUNC);p=q;}}
-for(const t of[0,.25,.5,.75,1]){const [u,v]=arch(t);let p=null;for(let i=0;i<=N;i++){if(!TUN[i]){p=null;continue;}const q=sp(i,u);q[1]+=v-.5;if(p)sTun.add(p,q,mul(TUNC,t===.5?.9:.6));p=q;}}
+for(const t of[0,.25,.5,.75,1]){const [u,v]=arch(t);let p=null;for(let i=0;i<=N;i++){if(!TUN[i]||BRK[i]){p=null;if(!TUN[i])continue;}const q=sp(i,u);q[1]+=v-.5;if(p)sTun.add(p,q,mul(TUNC,t===.5?.9:.6));p=q;}}
 const tunMat=lineMat();scene.add(sTun.mesh(tunMat));
 const contourObj=sC.mesh(contourMat);scene.add(contourObj,sT.mesh(trackMat),sW.mesh(wireMat),sS.mesh(stationMat));
 /* OpenStreetMap context layers (data/sanyo-context.js, from build_context.py) */
@@ -243,6 +298,7 @@ const layerObjs={};
 if(CTX&&!LIVE)for(const [k,L] of Object.entries(CTXL)){const lines=CTX.layers[k];if(!lines||!lines.length)continue;const S=new Seg(),col=mul(L.c,L.k),lift=k==='jr'||k==='rail'?1.5:.8;
  for(const a of lines){let p=null;for(let i=0;i<a.length;i+=2){const x=a[i],z=a[i+1],q=[x,k==='coast'?.3:Math.max(Hx(x,z,zAt(x)),0)+lift,z];if(p)S.add(p,q,col);p=q;}}
  const mat=lineMat(),o=S.mesh(mat);scene.add(o);layerObjs[k]={o,mat};}
+const LINE=LINE_SRC!=='curve';
 const SRC_NOTE=LIVE?'Live map: OpenStreetMap data via OpenFreeMap vector tiles, terrain from AWS Terrain Tiles; track alignment from OpenStreetMap.':LINE?'Track alignment, tunnels and viaducts'+(CTX?', plus coastline, rivers, roads and other railways,':'')+' from OpenStreetMap.':'Track is a smooth curve through station locations (data/sanyo-line.js not found).';
 
 /* ---------- live tile manager: vector + elevation tiles around the camera (fine near, coarse far), line work built per tile ---------- */
@@ -326,7 +382,7 @@ function buildBuildings(e){const L=e.data&&e.data.building;e.data=null;if(!L)ret
    const v0=P.length/3;for(const [X,Z] of pts)P.push(X,y1,Z);try{for(const t of THREE.ShapeUtils.triangulateShape(pts.map(([X,Z])=>new THREE.Vector2(X,Z)),[]))I.push(v0+t[0],v0+t[1],v0+t[2],v0+t[0],v0+t[2],v0+t[1]);}catch(_){}}}
  if(!S.p.length)return;e.objs.building=S.mesh(LTM.mats.building);scene.add(e.objs.building);
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setIndex(I);const m=new THREE.Mesh(g,bOcc);m.renderOrder=-1;e.objs.bocc=m;scene.add(m);}
-function disposeTile(e){for(const k in e.objs){scene.remove(e.objs[k]);e.objs[k].geometry.dispose();}e.objs={};}
+function disposeTile(e){for(const k in e.objs){scene.remove(e.objs[k]);e.objs[k].traverse(o=>{if(o.geometry)o.geometry.dispose();});}e.objs={};}
 function liveUpdate(now){if(!LIVE||now-LTM.last<250)return;LTM.last=now;
  const c=cam.position,g=heightAt(c.x,c.z),h=Math.max(c.y-(g===null?0:g),1),maxD=Math.min(Math.max(80000,h*2.2),2e6),want=[];
  pickTiles(Math.min(13,LIVE.vmax),1.0,maxD,want,'v');pickTiles(11,.9,maxD,want,'t');if(LTM.on.building&&h<2500&&LIVE.vmax>=14)pickBuildings(want);want.sort((a,b)=>a.d-b.d);
@@ -596,20 +652,22 @@ function segAt(t,d,g){const t1=g.v/ACC,t3=g.v/DEC;if(t<=0)return[0,0];if(t<t1)re
 const SV={nozomi:{cars:16,v:VF,col:[1.7,.95,.25]},hikari:{cars:16,v:VF,col:[1.6,1.5,.3]},mizuho:{cars:8,v:VF,col:[1.6,.35,.35]},sakura:{cars:8,v:VF,col:[1.5,.3,1.3]},tsubame:{cars:8,v:VK,col:[1.1,.6,1.6]},kodama:{cars:8,v:VK,col:[.3,1.5,.65]}};
 const STOPS={nozomi:['Shin-Osaka','Shin-Kobe','Okayama','Hiroshima','Kokura','Hakata'],sakura:['Shin-Osaka','Shin-Kobe','Himeji','Okayama','Fukuyama','Hiroshima','Shin-Yamaguchi','Kokura','Hakata']};
 const KI=n=>stations.findIndex(s=>s.name===n),LONGDW=new Set(['Okayama','Hiroshima','Kokura'].map(KI));
-function mkTrain(type,dir,hero){const sv=SV[type];let ks=type==='kodama'?stations.map((s,i)=>i):STOPS[type].map(KI);if(dir<0)ks=ks.slice().reverse();
- const cl=[];for(let i=0;i<sv.cars;i++)cl.push(i===0||i===sv.cars-1?27:25);return{type,dir,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(sv.cars-1),hero:!!hero,v:sv.v,ev:[]};}
-function planFixed(tr,dep){tr.ev=[];const n=tr.ks.length;for(let j=0;j<n;j++){const k=tr.ks[j],s=PC[k];let arr;
+/* every train moves forwards along its own route (dir is always 1); down is its direction on the line, for display */
+const SANYO_K=(LINES.find(L=>L.id==='sanyo')||LINES[0]).st.map(x=>x.k);
+function mkTrain(type,dir,hero){const sv=SV[type];let ks=type==='kodama'?SANYO_K.slice():STOPS[type].map(KI).filter(k=>k>=0);if(dir<0)ks=ks.slice().reverse();
+ const cl=[];for(let i=0;i<sv.cars;i++)cl.push(i===0||i===sv.cars-1?27:25);return{type,dir:1,down:dir,sv,ks,stopSet:new Set(ks),R:makeRoute(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(sv.cars-1),hero:!!hero,v:sv.v,ev:[]};}
+function planFixed(tr,dep){tr.ev=[];const n=tr.ks.length;for(let j=0;j<n;j++){const k=tr.ks[j],s=tr.R.uK.get(k);let arr;
  if(j===0)arr=dep-240;else{const p=tr.ev[j-1];p.d=Math.abs(s-p.s);p.g=segRun(p.d,tr.v);arr=p.dep+p.g.T;}
  tr.ev.push({k,s,arr,dep:j===0?dep:j===n-1?arr:arr+(LONGDW.has(k)?90:60)});}tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));}
 const SX={s:0,v:0,stop:-1,i:0};
 function stateAt(tr,t,o){const ev=tr.ev,n=ev.length;if(t<ev[0].arr||t>ev[n-1].arr+150)return null;let i=0;while(i<n-1&&t>ev[i+1].arr)i++;const e=ev[i];
  if(i===n-1||t<=e.dep){o.s=e.s;o.v=0;o.stop=e.k;o.i=i;return o;}const p=segAt(t-e.dep,e.d,e.g);o.s=e.s+tr.dir*p[0];o.v=p[1];o.stop=-1;o.i=i;return o;}
-function crossT(f,k,arrival){const e=f.evByK.get(k);if(e)return arrival?e.arr:e.dep;const sT=PC[k],ev=f.ev;let lo=ev[0].dep,hi=ev[ev.length-1].arr;
+function crossT(f,k,arrival){const e=f.evByK.get(k);if(e)return arrival?e.arr:e.dep;const sT=f.R.uK.get(k),ev=f.ev;if(sT===undefined)return null;let lo=ev[0].dep,hi=ev[ev.length-1].arr;
  if(f.dir*(stateAt(f,lo,SX).s-sT)>0||f.dir*(stateAt(f,hi,SX).s-sT)<0)return null;
  for(let i=0;i<36;i++){const m=(lo+hi)/2;if(f.dir*(stateAt(f,m,SX).s-sT)<0)lo=m;else hi=m;}return (lo+hi)/2;}
 function planKodama(tr,dep,fl){fl=fl.filter(f=>Math.abs(f.ev[0].dep-dep)<6*3600);tr.ev=[];const n=tr.ks.length;
- for(let j=0;j<n;j++){const k=tr.ks[j],s=PC[k],arr=j===0?dep-240:tr.ev[j-1].dep+tr.ev[j-1].g.T,e={k,s,arr,dep:j===0?dep:arr+60};
-  if(j<n-1){const k2=tr.ks[j+1];e.d=Math.abs(PC[k2]-s);e.g=segRun(e.d,tr.v);
+ for(let j=0;j<n;j++){const k=tr.ks[j],s=tr.R.uK.get(k),arr=j===0?dep-240:tr.ev[j-1].dep+tr.ev[j-1].g.T,e={k,s,arr,dep:j===0?dep:arr+60};
+  if(j<n-1){const k2=tr.ks[j+1];e.d=Math.abs(tr.R.uK.get(k2)-s);e.g=segRun(e.d,tr.v);
    for(let it=0;it<24;it++){let mv=false;const ka=e.dep+e.g.T;for(const f of fl){const ti=crossT(f,k,false);if(ti===null)continue;const to=crossT(f,k2,true);if(to===null)continue;if(ti>e.dep-60&&to<ka+75){e.dep=ti+100;mv=true;break;}}if(!mv)break;}}
   else e.dep=arr;tr.ev.push(e);}tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));}
 /* the real timetable (data/sanyo-timetable.js, rebuilt daily by .github/workflows/timetable.yml); the invented sample is the fallback */
@@ -618,20 +676,20 @@ const VMAX=300/3.6,RA=1/(2*ACC)+1/(2*DEC);
 /* cruise speed that covers d metres in the scheduled T seconds (accelerate, cruise, brake); capped at line speed */
 function fitRun(d,T){const D=T*T-4*RA*d;if(!(T>0)||D<=0)return segRun(d,VMAX);const v=Math.min(VMAX,(T-Math.sqrt(D))/(2*RA));return v>=VMAX-1e-6?segRun(d,VMAX):{v,T:d/v+RA*v};}
 const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama','名古屋':'Nagoya','京都':'Kyoto','熊本':'Kumamoto','鹿児島中央':'Kagoshima-Chuo','新鳥栖':'Shin-Tosu','久留米':'Kurume','筑後船小屋':'Chikugo-Funagoya','新大牟田':'Shin-Omuta','新玉名':'Shin-Tamana','新八代':'Shin-Yatsushiro','博多南':'Hakata-Minami'};
-function ttTrains(){const KJ=new Map(stations.map((s,i)=>[s.ja,i])),out=[];
+function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],cars=Math.max(4,Math.min(16,t.cars||sv.cars)),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
-  const ks=st.map(x=>KJ.get(x[0])),dir=PC[ks[ks.length-1]]>PC[ks[0]]?1:-1,is500=t.stock==='500'&&cars===8;
-  const tr={type,dir,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
+  const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
+  const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
    liv:cars>=16?'noz':'kyu',ev:[]};
-  st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:PC[k],arr:Math.min(arr,dep),dep});});
+  st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
  return out;}
 const trains=TT?ttTrains():[];let hero=null;
 if(!trains.length){const fast=[];
 for(let h=6;h<22;h++)for(const [m,ty] of[[0,'nozomi'],[5,'sakura'],[20,'nozomi'],[40,'nozomi']]){const a=mkTrain(ty,1);planFixed(a,h*3600+m*60);const b=mkTrain(ty,-1);planFixed(b,h*3600+(m+3)*60);fast.push(a,b);}
-const fDown=fast.filter(f=>f.dir===1),fUp=fast.filter(f=>f.dir===-1);trains.push(...fast);
+const fDown=fast.filter(f=>f.down===1),fUp=fast.filter(f=>f.down===-1);trains.push(...fast);
 for(let h=6;h<22;h++){const a=mkTrain('kodama',1,h===8);planKodama(a,h*3600+720,fDown);if(h===8)hero=a;const b=mkTrain('kodama',-1);planKodama(b,h*3600+1800,fUp);trains.push(a,b);}}
 /* time of day in Japan, as seconds after midnight (the timetable day runs 04:00 to 03:59) */
 function jstNow(){const d=new Date(Date.now()+9*3600e3);let t=d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds();if(t<4*3600)t+=86400;return t;}
@@ -641,10 +699,11 @@ const runningAt=(tr,t)=>t>=tr.ev[0].arr&&t<=tr.ev[tr.ev.length-1].arr;
 function pickFocus(t){const run=trains.filter(tr=>runningAt(tr,t));const mid=tr=>-(Math.min(t-tr.ev[0].arr,tr.ev[tr.ev.length-1].arr-t));
  const by=a=>a.sort((x,y)=>mid(x)-mid(y))[0];
  return by(run.filter(tr=>tr.hero))||by(run.filter(tr=>tr.type==='kodama'))||by(run)||trains.slice().sort((x,y)=>(x.ev[0].arr-t+86400*2)%86400-(y.ev[0].arr-t+86400*2)%86400)[0];}
-function latFor(tr,s){const k=nearestK(s);let off=2.15;if(tr.stopSet.has(k))off+=(tr.type==='kodama'&&stations[k].major?14:5)*loopAmt(Math.abs(s-PC[k]));return tr.dir*off;}
-function pose(tr,cs,o){const sf=cs+tr.dir*8.5,sr=cs-tr.dir*8.5;at(sf,latFor(tr,sf),A);at(sr,latFor(tr,sr),B);
+/* lateral offset (left of travel): the running line, swinging out to the platform loop at stations where the train stops */
+function latFor(tr,u){const [k,d]=nearRouteK(tr,u);let off=2.15;if(k>=0&&tr.stopSet.has(k))off+=(tr.type==='kodama'&&stations[k].major?14:5)*loopAmt(d);return off;}
+function pose(tr,cs,o){const sf=cs+8.5,sr=cs-8.5;atT(tr,sf,latFor(tr,sf),A);atT(tr,sr,latFor(tr,sr),B);
  let fx=A[0]-B[0],fy=A[1]-B[1],fz=A[2]-B[2];const l=Math.hypot(fx,fy,fz)||1;fx/=l;fy/=l;fz/=l;let sx=-fz,sz=fx;const sl=Math.hypot(sx,sz)||1;sx/=sl;sz/=sl;
- o.fx=fx;o.fy=fy;o.fz=fz;o.sx=sx;o.sy=0;o.sz=sz;o.ux=-sz*fy;o.uy=sz*fx-sx*fz;o.uz=sx*fy;o.cx=(A[0]+B[0])/2;o.cy=(A[1]+B[1])/2;o.cz=(A[2]+B[2])/2;o.tun=tunAt(cs);return o;}
+ o.fx=fx;o.fy=fy;o.fz=fz;o.sx=sx;o.sy=0;o.sz=sz;o.ux=-sz*fy;o.uy=sz*fx-sx*fz;o.uz=sx*fy;o.cx=(A[0]+B[0])/2;o.cy=(A[1]+B[1])/2;o.cz=(A[2]+B[2])/2;o.tun=tunT(tr,cs);return o;}
 function light(P,x,y,z,c,size){if(np>=MAXP)return;const i=np*3;PP[i]=P.cx+x*P.fx+y*P.ux+z*P.sx;PP[i+1]=P.cy+x*P.fy+y*P.uy+z*P.sy;PP[i+2]=P.cz+x*P.fz+y*P.uz+z*P.sz;PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=size;PK[np]=0;np++;}
 function wv(q,P,k){const i=nv*3;DP[i]=P.cx+q[0]*P.fx+q[1]*P.ux+q[2]*P.sx;DP[i+1]=P.cy+q[0]*P.fy+q[1]*P.uy+q[2]*P.sy;DP[i+2]=P.cz+q[0]*P.fz+q[1]*P.uz+q[2]*P.sz;DC[i]=NC[0]*k;DC[i+1]=NC[1]*k;DC[i+2]=NC[2]*k;nv++;}
 const PQ={},HP0={fx:1,fy:0,fz:0,ux:0,uy:1,uz:0,sx:0,sy:0,sz:1,cx:0,cy:0,cz:0,tun:0};
@@ -666,7 +725,7 @@ function placeHero(tr,st,cars,dt){const head=st.s+tr.dir*tr.len/2;let acc=0;
   if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);
   /* each car dims on its own as it passes a portal, eased over a few frames */
   const u=g.userData,tg=(1-.78*P.tun)*(mode==='board'&&FT===tr&&OB.view==='front'?.4:1);u.k+=(tg-u.k)*Math.min(1,dt*8);u.lm.uniforms.uMul.value=u.k;u.hm.uniforms.uMul.value=u.k;}}
-function dot(tr,st){if(np>=MAXP)return;at(st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
+function dot(tr,st){if(np>=MAXP)return;atT(tr,st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
 
 /* the followed train's own rails light up from its outermost wheels, forward (white) and back (red), fading over about a car length */
 const RG_AH=26,RG_BH=26,RG_ST=1,RGN=(RG_AH+RG_BH)/RG_ST*2+8,rgPos=new Float32Array(RGN*6),rgCol=new Float32Array(RGN*6),rgG=new THREE.BufferGeometry();
@@ -674,8 +733,8 @@ rgG.setAttribute('position',new THREE.BufferAttribute(rgPos,3).setUsage(THREE.Dy
 const rgMat=lineMat({nofade:true}),rgL=new THREE.LineSegments(rgG,rgMat);rgL.frustumCulled=false;scene.add(rgL);
 function railGlow(){const tr=FT,d=tr.dir,ax=(tr.hero?SPEC500.bog[0]:6.1)-1.25,head=fs.s+d*(tr.len/2-ax),tail=fs.s-d*(tr.len/2-ax);let n=0;const A2=[0,0,0],B2=[0,0,0];
  const put=(a,b,c0,c1)=>{const i=n*6;rgPos.set(a,i);rgPos.set(b,i+3);rgCol.set(c0,i);rgCol.set(c1,i+3);n++;};
- const run=(s0,sg,L,c)=>{for(const g of[-.75,.75]){let pa=null,ka=0;for(let u=0;u<=L+1e-6;u+=RG_ST){const s=s0+sg*u;if(s<0||s>LEN)break;at(s,latFor(tr,s)+g,A2);A2[1]+=.06;
-   const f=1-u/L,k=f*f*(TUN[trk(s).i]?.6:1)*(1-ovf);if(pa)put(pa,A2.slice(),mul(c,ka),mul(c,k));pa=A2.slice();ka=k;}}};
+ const run=(s0,sg,L,c)=>{for(const g of[-.75,.75]){let pa=null,ka=0;for(let u=0;u<=L+1e-6;u+=RG_ST){const s=s0+sg*u;atT(tr,s,latFor(tr,s)+g,A2);A2[1]+=.06;
+   const f=1-u/L,k=f*f*(tunT(tr,s)>.5?.6:1)*(1-ovf);if(pa)put(pa,A2.slice(),mul(c,ka),mul(c,k));pa=A2.slice();ka=k;}}};
  run(head,d,RG_AH,[2.6,2.6,2.6]);run(tail,-d,RG_BH,[4.2,.3,.18]);
  rgG.setDrawRange(0,n*2);rgG.attributes.position.needsUpdate=true;rgG.attributes.col.needsUpdate=true;}
 
@@ -712,7 +771,7 @@ const ss=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t
 const lerp=(a,b,t)=>a+(b-a)*t,lerpA=(a,b,t)=>{const d=((b-a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;return a+d*t;};
 const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 const wf=d=>1-ss(2000,20000,d); /* close in, yaw follows the train's heading; far out, it is fixed to the map */
-const overDist=()=>Math.min(ORB.max,Math.max(320000,300000/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
+const HALFX=Math.max(300000,(maxX-minX)*.55),HALFZ=Math.max(150000,(maxZ-minZ)*.55),overDist=()=>Math.min(ORB.max,Math.max(320000,Math.max(HALFX,HALFZ*cam.aspect)/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
 const PRESET={chase:()=>({yaw:Math.atan2(FP0.fz,FP0.fx)+.55,pitch:.12,dist:40}),over:()=>({yaw:ORB.yaw,pitch:1.05,dist:overDist()})};
 function flyTo(b,dur){anim={a:{yaw:ORB.yaw,pitch:ORB.pitch,dist:ORB.dist},b,t0:performance.now(),dur};}
 function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===null?hd:wrapA(hd-lastHd)*wf(ORB.dist);lastHd=hd;
@@ -729,12 +788,12 @@ function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===nu
 const cine={shot:null,t0:0,last:null,side:1,s:0,p:[0,0,0],yaw:0,u:0,ar:null,end:12,lt:0};
 const Q=[0,0,0],Q2=[0,0,0];
 const heroHead=()=>fs.s+FT.dir*FT.len/2;
-function beside(s,extra,dy,out){const l=latFor(FT,s);at(s,l+FT.dir*extra*cine.side,out);out[1]+=dy;return out;}
-function onTrain(s,dy,out){at(s,latFor(FT,s),out);out[1]+=dy;return out;}
-function findPortal(){const i0=Math.round(heroHead()/DS);for(let j=12;j<=40;j++){const i=i0+FT.dir*j,b=i-FT.dir;if(i<1||i>=N)break;if(TUN[i]&&!TUN[b])return i*DS;}return null;}
+function beside(s,extra,dy,out){const l=latFor(FT,s);atT(FT,s,l+extra*cine.side,out);out[1]+=dy;return out;}
+function onTrain(s,dy,out){atT(FT,s,latFor(FT,s),out);out[1]+=dy;return out;}
+function findPortal(){const h=heroHead();for(let j=12;j<=40;j++){const u=h+j*DS;if(u>FT.R.U)break;if(tunT(FT,u)>.5&&tunT(FT,u-DS)<.5)return u;}return null;}
 /* camera moves for otherwise-static shots: [along the direction of travel, towards the track (-) / away (+), up] in m/s, eased in */
 const Q3=[0,0,0];
-function moved(t){const o=trk(cine.sb),mv=cine.mv,te=t*t/(t+1.5),fx=o.tx*FT.dir,fz=o.tz*FT.dir,sg=FT.dir*cine.side,ox=o.tz*sg,oz=-o.tx*sg;
+function moved(t){const o=trkT(FT,cine.sb),mv=cine.mv,te=t*t/(t+1.5),fx=o.tx*FT.dir,fz=o.tz*FT.dir,sg=FT.dir*cine.side,ox=o.tz*sg,oz=-o.tx*sg;
  Q3[0]=cine.p[0]+fx*mv[0]*te+ox*mv[1]*te;Q3[1]=cine.p[1]+mv[2]*te;Q3[2]=cine.p[2]+fz*mv[0]*te+oz*mv[1]*te;return Q3;}
 /* framing: shots aim at one end of the train rather than its middle. rel is the aim point's distance back from the nose (m); it eases
    towards the requested value, so switching from the head to the tail is a pan, not a cut. */
@@ -746,7 +805,7 @@ const autoEnd=cs=>FT.dir*(cs-heroHead())>-25?REL.head():REL.tail();
 const tele=d=>Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));
 const SHOTS={
  flyby:{ja:'通過',en:'Flyby',ok:()=>fs.stop<0,
-  start(){let s=heroHead()+FT.dir*(260+Math.random()*200);for(let k=0;k<12&&TUN[trk(s).i];k++)s+=FT.dir*300;cine.s=Math.min(Math.max(s,50),LEN-50);const mv=[[7+Math.random()*4,0,.3],[1.5,0,1.8+Math.random()*.8],[2,0,-1.6],[2.5,-2.2,.15]][Math.random()*4|0];cine.mv=mv;cine.sb=cine.s;beside(cine.s,(mv[1]<0?18:12)+Math.random()*10,mv[2]<0?9+Math.random()*4:1.5+Math.random()*3,cine.p);},
+  start(){let s=heroHead()+FT.dir*(260+Math.random()*200);for(let k=0;k<12&&tunT(FT,s)>.5;k++)s+=FT.dir*300;cine.s=Math.min(Math.max(s,-300),FT.R.U+300);const mv=[[7+Math.random()*4,0,.3],[1.5,0,1.8+Math.random()*.8],[2,0,-1.6],[2.5,-2.2,.15]][Math.random()*4|0];cine.mv=mv;cine.sb=cine.s;beside(cine.s,(mv[1]<0?18:12)+Math.random()*10,mv[2]<0?9+Math.random()*4:1.5+Math.random()*3,cine.p);},
   upd(t){cam.position.fromArray(moved(t));aimRel(autoEnd(cine.s),1.8);cam.fov=Math.min(55,Math.max(22,tele(cam.position.distanceTo(T))));return FT.dir*(heroHead()-FT.dir*FT.len-cine.s)>70||t>13;}},
  track:{ja:'並走',en:'Tracking',ok:()=>fs.stop<0,start(){cine.u=Math.random()<.5?0:1;},
   upd(t){const f=Math.min(1,t/10),u=cine.u?1-f:f,s=heroHead()-FT.dir*FT.len*(.95-.85*u);cam.position.fromArray(beside(s,13,2.2,Q));T.fromArray(onTrain(s+FT.dir*35,1.8,Q2));cam.fov=40;return t>10;}},
@@ -766,10 +825,10 @@ const SHOTS={
   start(){cine.s=findPortal();cine.sb=cine.s-FT.dir*120;cine.mv=[1.6,0,1.3];beside(cine.sb,14,4,cine.p);},
   upd(t){cam.position.fromArray(moved(t));aimRel(Math.max(REL.head(),FT.dir*(heroHead()-cine.s)+6),1.8);cam.fov=tele(cam.position.distanceTo(T));return FT.dir*(heroHead()-cine.s)>FT.len+20||t>25;}},
  arrive:{ja:'到着',en:'Arrival',ok:()=>{const ne=FT.ev[fs.i+1];return fs.stop<0&&!!ne&&(ne.arr-simT)/Math.max(speed,1)<15;},
-  start(){const ne=FT.ev[fs.i+1],k=ne.k,o=FT.type==='kodama'&&stations[k].major?13.6:9.7;cine.k=k;cine.sb=ne.s+FT.dir*(FT.len/2+25);cine.mv=[1.1,0,.12];cine.s=ne.s;at(ne.s+FT.dir*(FT.len/2+25),FT.dir*o,cine.p);cine.p[1]+=2.85;},
+  start(){const ne=FT.ev[fs.i+1],k=ne.k,o=FT.type==='kodama'&&stations[k].major?13.6:9.7;cine.k=k;cine.sb=ne.s+FT.dir*(FT.len/2+25);cine.mv=[1.1,0,.12];cine.s=ne.s;atT(FT,ne.s+FT.dir*(FT.len/2+25),o,cine.p);cine.p[1]+=2.85;},
   upd(t){cam.position.fromArray(moved(t));aimRel(REL.head(),1.6);const d=cam.position.distanceTo(T);cam.fov=Math.min(50,Math.max(20,tele(d)*1.4));return(fs.stop===cine.k&&t>6)||t>25;}},
  station:{ja:'停車',en:'Station',ok:()=>fs.stop>=0,
-  start(){cine.sb=fs.s+FT.dir*(FT.len/2+12);cine.mv=[-1.3,0,0];const k=fs.stop,m=stations[k].major?11.65:10.9;at(fs.s+FT.dir*(FT.len/2+12),FT.dir*m,cine.p);cine.p[1]+=2.6;},
+  start(){cine.sb=fs.s+FT.dir*(FT.len/2+12);cine.mv=[-1.3,0,0];const k=fs.stop,m=stations[k].major?11.65:10.9;atT(FT,fs.s+FT.dir*(FT.len/2+12),m,cine.p);cine.p[1]+=2.6;},
   upd(t){cam.position.fromArray(moved(t));T.set(FP0.cx-FP0.fx*30,FP0.cy+2,FP0.cz-FP0.fz*30);cam.fov=50;return(fs.stop<0&&t>3)||t>16;}},
 };
 function nextShot(now){if(SHOTS.arrive.ok()&&cine.last!=='arrive'){cine.shot=cine.last='arrive';cine.side=1;cine.t0=now;cine.ar=null;SHOTS.arrive.start();clearP=true;$('#shot').textContent=`${SHOTS.arrive.ja} ${SHOTS.arrive.en}`;return;}
@@ -819,7 +878,7 @@ for(const g of document.querySelectorAll('.grp')){const ic=g.querySelector('.ico
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.grp'))for(const x of document.querySelectorAll('.grp'))x.classList.remove('open');});
 function setOB(v){OB.view=v;OB.yaw=0;OB.pitch=0;clearP=true;for(const b of document.querySelectorAll('#obUi button'))b.classList.toggle('on',b.dataset.v===v);}
 $('#obUi').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setOB(b.dataset.v);});
-function setPlat(k,side){PLAT_CAM.k=k;PLAT_CAM.side=side;PLAT_CAM.yaw=0;PLAT_CAM.pitch=0;$('#plat').value=String(k);$('#platSide').textContent=side>0?'下り Hakata-bound':'上り Shin-Osaka-bound';clearP=true;boardT=0;}
+function setPlat(k,side){PLAT_CAM.k=k;PLAT_CAM.side=side;PLAT_CAM.yaw=0;PLAT_CAM.pitch=0;$('#plat').value=String(k);$('#platSide').textContent=bound(k,side);clearP=true;boardT=0;}
 {const sel=$('#plat');stations.forEach((s,k)=>{const o=document.createElement('option');o.value=String(k);o.textContent=`${s.ja} ${s.name}`;sel.appendChild(o);});
  sel.addEventListener('change',()=>setPlat(+sel.value,PLAT_CAM.side));$('#platSide').addEventListener('click',()=>setPlat(PLAT_CAM.k,-PLAT_CAM.side));}
 /* departure board for the platform you're on */
@@ -828,10 +887,16 @@ const SVN={nozomi:['のぞみ','Nozomi'],hikari:['ひかり','Hikari'],mizuho:['
 const tName=tr=>{const n=SVN[tr.type];return tr.num?[`${n[0]}${tr.num}号`,`${n[1]} ${tr.num}`]:n;};
 const tDest=tr=>tr.dest?{ja:tr.dest,name:DEST_EN[tr.dest]||(stations.find(x=>x.ja===tr.dest)||{}).name||tr.dest}:stations[tr.ks[tr.ks.length-1]];
 const tStock=tr=>tr.hero?['500系','500 series']:tr.stock==='700'?['700系','700 series']:tr.stock==='N700S'?['N700S','N700S']:tr.stock==='N700A'?['N700A','N700A']:tr.stock==='800'?['800系','800 series']:(tr.liv||(tr.type==='nozomi'?'noz':'kyu'))==='noz'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];let boardT=0;
+/* which way a train passes station k, relative to that station's platform line: +1 towards the line's last station */
+function trainSide(tr,k){const u=tr.R.uK.get(k);if(u===undefined)return 0;const r=rS(tr,u);if(r.li===stations[k].li)return r.sg;const a=trkT(tr,u),ax=a.tx,az=a.tz,b=trk(PC[k]);return ax*b.tx+az*b.tz>0?1:-1;}
+function bound(k,sd){const L=LINES[stations[k].li];let e=L.st[sd>0?L.st.length-1:0].k;
+ /* at the end of its line (Shin-Osaka, Tokyo...), name the far end of the line it continues onto */
+ if(e===k)for(const o of stations[k].on){const L2=LINES[o.li];if(o.li===L.id)continue;if(sd>0&&L2.st[0].k===k){e=L2.st[L2.st.length-1].k;break;}if(sd<0&&L2.st[L2.st.length-1].k===k){e=L2.st[0].k;break;}}
+ return `${sd>0?'下り':'上り'} ${e===k?'Terminating':stations[e].name+'-bound'}`;}
 function updBoard(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,rows=[];
- for(const tr of trains){if(tr.dir!==sd)continue;const ev=tr.ev;if(ev[ev.length-1].arr<simT-60||ev[0].arr>simT+5400)continue;
+ for(const tr of trains){if(trainSide(tr,k)!==sd)continue;const ev=tr.ev;if(ev[ev.length-1].arr<simT-60||ev[0].arr>simT+5400)continue;
   const e=tr.evByK.get(k);let t;if(e){if(e.dep<simT-5)continue;t=e===ev[0]?e.dep:e.arr;}else{t=crossT(tr,k,false);if(t===null||t<simT-5)continue;}rows.push({t,e,tr});}
- rows.sort((a,b)=>a.t-b.t);const st=stations[k];$('#boardTitle').textContent=`${st.ja} ${st.name} · ${sd>0?'下り Hakata-bound':'上り Shin-Osaka-bound'}`;
+ rows.sort((a,b)=>a.t-b.t);const st=stations[k];$('#boardTitle').textContent=`${st.ja} ${st.name} · ${bound(k,sd)}`;
  const tb=$('#boardRows');tb.textContent='';
  for(const r of rows.slice(0,5)){const tr=r.tr,n=tName(tr),dest=tDest(tr),e=r.e;let status;
   if(e&&simT>=e.arr&&simT<=e.dep)status='停車中 At platform';else if(!e)status=r.t-simT<90?'まもなく通過 Passing now':'通過 Passing';else if(e===tr.ev[tr.ev.length-1])status='終着 Terminates';else status=r.t-simT<90?'まもなく到着 Arriving':'停車 Stops';
@@ -853,10 +918,10 @@ function setFocus(tr){if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
  clearP=true;cine.shot=null;anim=null;$('#trainSel').value=String(trains.indexOf(tr));selKey='';}
 /* train selector: every running train, down trains first, in departure order */
 let selKey='',selT=0;
-function updTrainSel(){const act=trains.filter(tr=>tr===FT||stateAt(tr,simT,FSX)).sort((a,b)=>b.dir-a.dir||a.ev[0].dep-b.ev[0].dep),key=act.map(tr=>trains.indexOf(tr)).join(',');
+function updTrainSel(){const act=trains.filter(tr=>tr===FT||stateAt(tr,simT,FSX)).sort((a,b)=>b.down-a.down||a.ev[0].dep-b.ev[0].dep),key=act.map(tr=>trains.indexOf(tr)).join(',');
  if(key===selKey)return;selKey=key;const sel=$('#trainSel');sel.textContent='';
  for(const tr of act){const o=document.createElement('option'),n=tName(tr),dest=tDest(tr);o.value=String(trains.indexOf(tr));
-  o.textContent=`${tr.dir>0?'▼':'▲'} ${n[0]} ${n[1]}${tr.hero?' · 500系':''} ${hm(tr.ev[0].dep)} → ${dest.ja} ${dest.name}`;sel.appendChild(o);}
+  o.textContent=`${tr.down>0?'▼':'▲'} ${n[0]} ${n[1]}${tr.hero?' · 500系':''} ${hm(tr.ev[0].dep)} → ${dest.ja} ${dest.name}`;sel.appendChild(o);}
  sel.value=String(trains.indexOf(FT));}
 $('#trainSel').addEventListener('change',e=>setFocus(trains[+e.target.value]));
 /* ---------- labels + HUD ---------- */
@@ -869,8 +934,8 @@ function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;
 const pad=n=>String(n).padStart(2,'0'),fmt=t=>{t=((t%86400)+86400)%86400;return `${pad(t/3600|0)}:${pad((t/60|0)%60)}:${pad(t%60|0)}`;},hm=t=>fmt(t).slice(0,5);
 const E={clock:$('#clock'),cnt:$('#cnt'),spd:$('#spd'),stat:$('#stat'),next:$('#next'),km:$('#km')};let hudT=0,active=0;
 function updHud(){const h=fs,ev=FT.ev,n=tName(FT),md=tStock(FT);$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`+(LIVE?` · tiles ${LTM.ready}/${LTM.want}`:'');E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
- if(h.stop>=0){const e=ev[h.i];E.stat.textContent=simT<e.dep?`${nm(h.stop)}, leaves ${hm(e.dep)}`:`At ${nm(h.stop)}`;}else E.stat.textContent=TUN[trk(h.s).i]?'トンネル In tunnel':'走行中 Running';
- const ne=ev[h.i+1];E.next.textContent=ne?`${nm(ne.k)} ${hm(ne.arr)}`:'終点 Terminus';E.km.textContent=`${(h.s/1000).toFixed(1)} km from Shin-Osaka`;}
+ if(h.stop>=0){const e=ev[h.i];E.stat.textContent=simT<e.dep?`${nm(h.stop)}, leaves ${hm(e.dep)}`:`At ${nm(h.stop)}`;}else E.stat.textContent=tunT(FT,h.s)>.5?'トンネル In tunnel':'走行中 Running';
+ const ne=ev[h.i+1];E.next.textContent=ne?`${nm(ne.k)} ${hm(ne.arr)}`:'終点 Terminus';{const r=rS(FT,h.s),L=LINES[r.li];E.km.textContent=`${L.ja} ${((r.S-L.st[0].S)/1000).toFixed(1)} km from ${stations[L.st[0].k].name}`;}}
 
 /* ---------- frame loop ---------- */
 /* the clock: real time in Japan when the real timetable is loaded (jumping to the next train if none is running), else the sample day */

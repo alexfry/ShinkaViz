@@ -27,7 +27,10 @@ SANYO = ['新大阪', '新神戸', '西明石', '姫路', '相生', '岡山', '�
 OTHER = ['東京', '品川', '新横浜', '小田原', '熱海', '三島', '新富士', '静岡', '掛川', '浜松', '豊橋', '三河安城', '名古屋',
          '岐阜羽島', '米原', '京都', '新鳥栖', '久留米', '筑後船小屋', '新大牟田', '新玉名', '熊本', '新八代', '新水俣',
          '出水', '川内', '鹿児島中央', '博多南']
-ALL = sorted(SANYO + OTHER, key=len, reverse=True)   # longest first, so 新大阪 never matches as 大阪 etc.
+# every station on a line in tools/lines.json counts as a stop we keep (so through trains get their whole route)
+_cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lines.json'), encoding='utf-8'))['lines']
+NETWORK = sorted({st[0] for L in _cfg for st in L['stations']})
+ALL = sorted(set(SANYO + OTHER + NETWORK), key=len, reverse=True)   # longest first, so 新大阪 never matches as 大阪 etc.
 TYPES = {'のぞみ': 'nozomi', 'ひかり': 'hikari', 'こだま': 'kodama', 'みずほ': 'mizuho', 'さくら': 'sakura', 'つばめ': 'tsubame'}
 UA = 'ShinkaViz timetable builder (+https://github.com/alexfry/ShinkaViz)'
 
@@ -156,11 +159,10 @@ def main():
         if a.dump and n < 6: open(os.path.join(a.dump, f'train-{tid}.html'), 'w').write(page)
         if n < a.show: print(f'--- train page {tid} ---\n' + '\n'.join(text_lines(page)[:120]) + '\n---', flush=True)
         t = parse_train(page)
-        if t: t['stops'] = [s for s in t['stops'] if s[0] in SANYO]
+        if t: t['stops'] = [s for s in t['stops'] if s[0] in NETWORK]
         if not t or len(t['stops']) < 2 or any(s[1] is None and s[2] is None for s in t['stops']):
             bad += 1; print(f'  skip {tid}: could not read', file=sys.stderr); continue
-        a0, a1 = SANYO.index(t['stops'][0][0]), SANYO.index(t['stops'][-1][0])
-        t['dir'] = 1 if a1 > a0 else -1
+        t['dir'] = 1 if t['num'] % 2 else -1          # odd numbers run down (away from Tokyo)
         t['id'] = tid
         trains.append(t)
         if n % 25 == 0: print(f'  {n + 1}/{len(ids)} {t["name"]}{t["num"]} {t["stock"]} {len(t["stops"])} stops', flush=True)
