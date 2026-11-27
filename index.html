@@ -609,11 +609,11 @@ function placeHero(st,dt){const head=st.s+hero.dir*hero.len/2;let acc=0;
  tf+=((HP0.tun?.22:1)*(mode==='board'&&FT===hero&&OB.view==='front'?.4:1)-tf)*Math.min(1,dt*5);heroMat.uniforms.uMul.value=tf;hullMat.uniforms.uMul.value=tf;}
 function dot(tr,st){if(np>=MAXP)return;at(st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
 
-/* the followed train's own rails light up ahead of the nose (white) and behind the tail (red), fading with distance */
-const RG_AH=1500,RG_BH=1000,RG_ST=10,RGN=(RG_AH+RG_BH)/RG_ST*2+8,rgPos=new Float32Array(RGN*6),rgCol=new Float32Array(RGN*6),rgG=new THREE.BufferGeometry();
+/* the followed train's own rails light up from its outermost wheels, forward (white) and back (red), fading over about a car length */
+const RG_AH=26,RG_BH=26,RG_ST=1,RGN=(RG_AH+RG_BH)/RG_ST*2+8,rgPos=new Float32Array(RGN*6),rgCol=new Float32Array(RGN*6),rgG=new THREE.BufferGeometry();
 rgG.setAttribute('position',new THREE.BufferAttribute(rgPos,3).setUsage(THREE.DynamicDrawUsage));rgG.setAttribute('col',new THREE.BufferAttribute(rgCol,3).setUsage(THREE.DynamicDrawUsage));
 const rgMat=lineMat({nofade:true}),rgL=new THREE.LineSegments(rgG,rgMat);rgL.frustumCulled=false;scene.add(rgL);
-function railGlow(){const tr=FT,d=tr.dir,head=fs.s+d*tr.len/2,tail=fs.s-d*tr.len/2;let n=0;const A2=[0,0,0],B2=[0,0,0];
+function railGlow(){const tr=FT,d=tr.dir,ax=(tr.hero?SPEC500.bog[0]:6.1)-1.25,head=fs.s+d*(tr.len/2-ax),tail=fs.s-d*(tr.len/2-ax);let n=0;const A2=[0,0,0],B2=[0,0,0];
  const put=(a,b,c0,c1)=>{const i=n*6;rgPos.set(a,i);rgPos.set(b,i+3);rgCol.set(c0,i);rgCol.set(c1,i+3);n++;};
  const run=(s0,sg,L,c)=>{for(const g of[-.75,.75]){let pa=null,ka=0;for(let u=0;u<=L+1e-6;u+=RG_ST){const s=s0+sg*u;if(s<0||s>LEN)break;at(s,latFor(tr,s)+g,A2);A2[1]+=.06;
    const f=1-u/L,k=f*f*(TUN[trk(s).i]?.6:1)*(1-ovf);if(pa)put(pa,A2.slice(),mul(c,ka),mul(c,k));pa=A2.slice();ka=k;}}};
