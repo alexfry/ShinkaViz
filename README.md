@@ -16,7 +16,7 @@ What is real so far:
 What is placeholder:
 - **Track layout at stations:** passing loops and platforms are generic, not the real layouts.
 - **Terrain:** procedural noise. To be replaced by GSI DEM elevation tiles.
-- **Timetable:** an invented sample. A scheduling pass holds each Kodama at stations so faster trains overtake it there.
+- **Timetable:** the real JR West timetable for the day (see Timetable below), with an invented sample day as a fallback.
 - **500 series pantograph type and position:** unverified.
 - **N700 family (all other trains):** fitted to an N700 Sakura design drawing (side and front views and dimensions). The nose contours are traced in the front view and projected onto the nose. Nozomi (N700A) is white with a blue stripe; Sakura and Kodama (7000/8000 series) are navy with a gold stripe. Trains within 3.5 km of the camera are drawn at full detail with instanced geometry; farther ones are simple boxes.
 
