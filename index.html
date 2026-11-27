@@ -321,16 +321,19 @@ function patch(x,z){const cx=Math.round(x/NPs)*NPs,cz=Math.round(z/NPs)*NPs;if(M
 /* ---------- train models: a shared builder; each model is a spec (section tables + livery/cab decoration) ----------
    d = metres back from the nose tip. Tables: half-width, top of nose (without canopy), canopy rise, underside. */
 function tab(T,d){if(d<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(d<=T[i][0]){const [d0,v0]=T[i-1],[d1,v1]=T[i];return v0+(v1-v0)*(d-d0)/(d1-d0);}return T[T.length-1][1];}
-function buildModel(SP){const {LN,MR,NU,TAB_W,TAB_T,TAB_C,TAB_B}=SP;
+function buildModel(SP){const {LN,MR,TAB_W,TAB_T,TAB_C,TAB_B}=SP,NUf=typeof SP.NU==='function'?SP.NU:()=>SP.NU,BUMP=SP.bump||14;
 function bogiesOf(len,nf,nr){const b=SP.bog;return nf?[len/2-b[0],len/2-b[1]]:nr?[-len/2+b[0],-len/2+b[1]]:[-8.75,8.75];}
+function frontPoint(len,nf,nr,z,y){for(let d=0;d<=LN;d+=.02){const x=nf?len/2-d:-len/2+d,p=prof(x,len,nf,nr);if(y<p[1])continue;
+  let inside;if(y>=p[5])inside=y<=topAt(p,z,0)&&Math.abs(z)<=p[0]/2;else{const q=(p[5]-y)/(p[5]-p[1]);inside=q<1&&Math.abs(z)<=p[0]/2*Math.pow(1-Math.pow(q,p[6]),1/p[6]);}
+  if(inside)return [x,y,z];}return null;}
 function noseD(x,len,nf,nr){if(nf&&x>len/2-LN)return len/2-x;if(nr&&x<-len/2+LN)return x+len/2;return LN;}
 /* section params: [full width, underside, top (no canopy), canopy rise, d, waist height, lower exponent] */
 function prof(x,len,nf,nr){const d=Math.max(0,noseD(x,len,nf,nr)),yb0=tab(TAB_B,d),yt=tab(TAB_T,d);let yb=yb0;
  for(const xb of bogiesOf(len,nf,nr)){const u=Math.abs(x-xb)/2.1;if(u<1)yb=Math.max(yb,SP.skirt+.48*Math.sqrt(1-u*u));}
- return [2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb0+SP.waist*(yt-yb0),SP.nl(d)];}
-function sec(th,p,gr){const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?NU:p[6],b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,14);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
+ return [2*tab(TAB_W,d),yb,yt,d<LN?tab(TAB_C,d):0,d,yb0+SP.waist*(yt-yb0),SP.nl(d),NUf(d)];}
+function sec(th,p,gr){const c=Math.cos(th),s=Math.sin(th),a=p[0]/2+gr,yc=p[5],up=s>=0,n=up?p[7]:p[6],b=(up?p[2]-yc:yc-p[1])+gr;let y=yc+b*Math.sign(s)*Math.pow(Math.abs(s),2/n);if(up)y+=p[3]*Math.pow(s,BUMP);return [a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y];}
 /* point on the upper surface at lateral offset z (canopy included) */
-function topAt(p,z,gr){const a=p[0]/2+gr,q=Math.min(.999,Math.abs(z)/a),u=Math.pow(1-Math.pow(q,NU),1/NU),b=p[2]-p[5]+gr,s=Math.pow(u,NU/2);return p[5]+b*u+p[3]*Math.pow(s,14);}
+function topAt(p,z,gr){const NU=p[7],a=p[0]/2+gr,q=Math.min(.999,Math.abs(z)/a),u=Math.pow(1-Math.pow(q,NU),1/NU),b=p[2]-p[5]+gr,s=Math.pow(u,NU/2);return p[5]+b*u+p[3]*Math.pow(s,BUMP);}
 function carGeo(len,nf,nr){const xs=[],NK=48;
  if(nr)for(let k=0;k<=NK;k++)xs.push(-len/2+LN*Math.pow(k/NK,1.6));else xs.push(-len/2);
  if(nf)for(let k=NK;k>=0;k--)xs.push(len/2-LN*Math.pow(k/NK,1.6));else xs.push(len/2);
@@ -345,14 +348,15 @@ const HB=[.45,.62,.95],HS=[.1,.3,1.0],HC=[.8,.9,1.0],HG=[.25,.4,.6],HPn=[.6,.8,1
 function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
  /* x for a distance d back from this car's nose; dOf for the reverse */
  const xAt=d=>nf?len/2-d:nr?-len/2+d:null,dOf=x=>nf?len/2-x:nr?x+len/2:1e9;
- const zOn=(x,y)=>{const p=P(x),yc=p[5];let q,n;if(y>=yc){q=(y-yc)/(p[2]-yc);n=NU;}else{q=(yc-y)/(yc-p[1]);n=p[6];}if(q>=.999)return null;return (p[0]/2+.03)*Math.pow(1-Math.pow(q,n),1/n);};
+ const zOn=(x,y)=>{const p=P(x),yc=p[5];let q,n;if(y>=yc){q=(y-yc)/(p[2]-yc);n=p[7];}else{q=(yc-y)/(yc-p[1]);n=p[6];}if(q>=.999)return null;return (p[0]/2+.03)*Math.pow(1-Math.pow(q,n),1/n);};
  const xs=[];for(let x=-len/2;x<=len/2+1e-6;x+=.5)xs.push(x);
  const lon=(y,c,dMin=0)=>{for(const sd of[-1,1]){let p=null;for(const x of xs){const z=dOf(x)>=dMin?zOn(x,y):null;if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}};
  const along=(th,c)=>{let p=null;for(const x of xs){const q=sec(th,P(x),.03),v=[x,q[1],q[0]];if(p)S.add(p,v,c);p=v;}};
  const rect=(x0,x1,y0,y1,c)=>{for(const sd of[-1,1]){for(const x of[x0,x1]){let p=null;for(let k=0;k<=6;k++){const y=y0+(y1-y0)*k/6,z=zOn(x,y);if(z===null){p=null;continue;}const q=[x,y,sd*z];if(p)S.add(p,q,c);p=q;}}
   for(const y of[y0,y1]){const za=zOn(x0,y),zb=zOn(x1,y);if(za!==null&&zb!==null)S.add([x0,y,sd*za],[x1,y,sd*zb],c);}}};
  const pt=(d,z,gr)=>{const x=xAt(d);return [x,topAt(P(x),z,gr),z];};
- SP.decorate({S,P,len,nf,nr,xAt,dOf,zOn,lon,along,rect,pt,sec});
+ const pf=(z,y,gr=.04)=>{const q=frontPoint(len,nf,nr,z,y);return q?[q[0]+(nf?gr:-gr),q[1],q[2]]:null;};
+ SP.decorate({S,P,len,nf,nr,xAt,dOf,zOn,lon,along,rect,pt,sec,pf});
  const ring=x=>{const p=P(x);let q0=null;for(let m=0;m<=MR;m++){const q=sec(m/MR*Math.PI*2,p,.03),v=[x,q[1],q[0]];if(q0)S.add(q0,v,mul(HB,.7));q0=v;}};
  if(!nr)ring(-len/2+.05);if(!nf)ring(len/2-.05);
  along(0,mul(HB,.5));along(Math.PI,mul(HB,.5));                  /* waist */
@@ -366,7 +370,7 @@ function carLines(len,nf,nr,px){const S=new Seg(),P=x=>prof(x,len,nf,nr);
   for(const sd of[-.12,.12]){S.add([px+.7,y0+.05,sd],[px-.9,4.4,sd],c);S.add([px-.9,4.4,sd],[px+.25,4.97,sd],c);}
   S.add([px+.25,4.97,-.8],[px+.25,4.97,.8],mul(HPn,2));S.add([px+.25,4.97,.8],[px+.25,4.84,1.02],c);S.add([px+.25,4.97,-.8],[px+.25,4.84,-1.02],c);}
  return S;}
-return {prof,sec,topAt,carGeo,carLines,bogiesOf,SP};}
+return {prof,sec,topAt,carGeo,carLines,bogiesOf,frontPoint,SP};}
 const HB=[.45,.62,.95],HS=[.1,.3,1.0],HC=[.8,.9,1.0],HG=[.25,.4,.6],HPn=[.6,.8,1.0];
 /* 500 series, fitted to a JR West V-set elevation drawing (end car, 27 m; measured at 55.7 px/m). */
 const GLASS=[[[2.946,-0.377],[3.067,-0.359],[3.196,-0.359],[3.325,-0.359],[3.454,-0.359],[3.565,-0.415],[3.67,-0.489],[3.776,-0.563],[3.881,-0.637],[3.987,-0.71],[4.024,-0.82],[3.909,-0.862],[3.781,-0.859],[3.653,-0.841],[3.53,-0.804],[3.409,-0.76],[3.29,-0.711],[3.176,-0.652],[3.067,-0.583],[2.972,-0.5]],[[2.964,0.467],[3.056,0.559],[3.148,0.651],[3.252,0.728],[3.37,0.78],[3.493,0.823],[3.618,0.86],[3.745,0.885],[3.874,0.898],[4.004,0.898],[4.059,0.824],[3.969,0.734],[3.863,0.659],[3.756,0.585],[3.65,0.51],[3.543,0.436],[3.426,0.395],[3.296,0.395],[3.166,0.395],[3.036,0.395]],[[3.808,-0.126],[3.963,0.03],[4.172,0.072],[4.394,0.072],[4.616,0.072],[4.838,0.072],[5.06,0.072],[5.282,0.072],[5.407,-0.036],[5.407,-0.258],[5.407,-0.48],[5.383,-0.699],[5.252,-0.847],[5.032,-0.862],[4.81,-0.843],[4.594,-0.794],[4.384,-0.724],[4.185,-0.626],[4.003,-0.5],[3.852,-0.339]],[[3.952,0.251],[4.022,0.427],[4.161,0.555],[4.305,0.678],[4.462,0.781],[4.643,0.832],[4.829,0.869],[5.017,0.88],[5.206,0.88],[5.388,0.863],[5.407,0.682],[5.407,0.493],[5.39,0.308],[5.24,0.216],[5.051,0.216],[4.862,0.216],[4.673,0.216],[4.484,0.216],[4.294,0.216],[4.105,0.216]],[[5.551,0.647],[5.611,0.758],[5.734,0.79],[5.863,0.788],[5.983,0.743],[6.099,0.687],[6.21,0.621],[6.316,0.548],[6.415,0.466],[6.485,0.362],[6.429,0.25],[6.307,0.234],[6.178,0.234],[6.05,0.234],[5.921,0.234],[5.792,0.234],[5.663,0.234],[5.551,0.26],[5.551,0.389],[5.551,0.518]],[[5.551,-0.539],[5.618,-0.445],[5.736,-0.431],[5.857,-0.431],[5.979,-0.431],[6.1,-0.431],[6.221,-0.431],[6.342,-0.431],[6.461,-0.437],[6.485,-0.544],[6.439,-0.652],[6.338,-0.716],[6.228,-0.763],[6.108,-0.781],[5.988,-0.795],[5.868,-0.81],[5.748,-0.824],[5.627,-0.826],[5.551,-0.781],[5.551,-0.66]]];
@@ -395,26 +399,41 @@ const SPEC500={LN:15,MR:40,NU:2.3,skirt:.32,waist:.43,bog:[5.7,23.23],nl:d=>3+6*
   {let p=null;for(let k=0;k<=10;k++){const q=pt(2.75*k/10,0,.03);if(p)S.add(p,q,mul(HB,1.3));p=q;}}};
  if(nf||nr)nose();}};
 const M500=buildModel(SPEC500);
-/* N700 family: N700A/N700S on Nozomi, 7000/8000 series on Sakura and Kodama. Approximate proportions (no drawing yet):
-   wide "duck-bill" nose (10.7 m), aero double-wing ridges, wrap-around windscreen, boxier section. */
-const N7GLASS=[[5.15,0],[5.25,.45],[5.6,.8],[6.4,.98],[7.3,1.0],[7.65,.6],[7.75,0],[7.65,-.6],[7.3,-1.0],[6.4,-.98],[5.6,-.8],[5.25,-.45]];
-function specN700(liv){return {LN:10.7,MR:36,NU:3,skirt:.4,waist:.42,bog:[5.4,22.9],nl:d=>3+2*Math.min(1,d/6),
- TAB_W:[[0,.5],[.5,.82],[1,1.02],[2,1.28],[3,1.44],[4,1.54],[5,1.61],[6,1.65],[8,1.68],[10.7,1.68]],
- TAB_T:[[0,.95],[.5,1.08],[1,1.18],[2,1.36],[3,1.58],[4,1.84],[5,2.14],[6,2.52],[7,2.92],[8,3.22],[9,3.42],[10.7,3.58]],
- TAB_C:[[5,0],[6,.07],[7,.1],[8,.06],[9,0]],
- TAB_B:[[0,.78],[.5,.58],[1,.48],[2,.42],[10.7,.4]],
- decorate({S,P,len,nf,nr,xAt,lon,rect,pt,sec}){
-  const st=liv==='noz'?[mul(HS,3.2),mul(HS,3.2),mul(HS,2.2)]:[mul([.08,.2,.75],3),mul([.08,.2,.75],3),[1.7,1.2,.3]];
-  lon(1.80,st[0],1.2);lon(1.62,st[1],1.2);lon(1.50,st[2],2.5);          /* stripe, sweeping into the nose */
-  lon(3.3,mul(HB,.5),10.7);                                               /* roof shoulder */
-  const doors=nf?[xAt(9.6),-len/2+3.1]:nr?[xAt(9.6),len/2-3.1]:[-len/2+1.6,len/2-1.6];
-  for(const d of doors)rect(d-.38,d+.38,1.3,3.1,mul(HB,1.2));
+/* N700 family (N700A on Nozomi, 7000/8000 series on Sakura and Kodama). Fitted to an N700 Sakura design drawing
+   (27.35 m end car: 6.1 m tip to bogie, 17.5 m bogie centres, 2.5 m wheelbase, 3.36 x 3.6 m section; measured at 38.3 px/m).
+   Nose contours are traced in the front view and projected back onto the nose surface. */
+const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+const N7FV={ /* front-view curves: [z, height] in metres, z>0 = right; mirrored */
+ outer:[[1.29,3.49],[1.23,3.07],[1.07,2.49],[.78,1.91],[.45,1.45],[.19,1.0],[.13,.84]],
+ inner:[[.87,3.52],[.83,3.0],[.71,2.42],[.48,1.97],[.23,1.52],[.1,1.07]]};
+function specN700(liv){return {LN:10.7,MR:40,NU:d=>2.5+5.5*sm(0,9,d),bump:8,skirt:.21,waist:.41,bog:[6.1,23.6],nl:d=>3+3*sm(0,6,d),
+ TAB_W:[[0,.3],[.06,.48],[.28,1.0],[.63,1.28],[1.15,1.44],[2.02,1.55],[2.89,1.6],[3.76,1.64],[4.98,1.67],[6,1.68],[10.7,1.68]],
+ TAB_T:[[0,.99],[.05,1.17],[.1,1.28],[.16,1.36],[.26,1.49],[.37,1.59],[.52,1.7],[.78,1.78],[1.04,1.85],[1.31,1.93],[1.57,1.98],[2.09,2.09],[2.61,2.22],[3.13,2.32],[3.66,2.43],[4.2,2.57],[4.7,2.68],[5.2,2.8],[5.7,2.93],[6.27,3.12],[6.79,3.3],[7.31,3.37],[8.09,3.45],[8.88,3.52],[9.4,3.55],[10.2,3.58],[10.7,3.6]],
+ TAB_C:[[3.7,0],[3.95,.12],[4.44,.2],[4.96,.17],[5.48,.18],[6,.17],[6.5,.08],[7,0]],
+ TAB_B:[[0,.55],[.1,.5],[.2,.42],[.5,.4],[.75,.29],[1,.21],[10.7,.21]],
+ decorate({S,P,len,nf,nr,xAt,lon,rect,pt,pf}){
+  /* livery heights from the drawing: windows 2.17-2.69 m, stripe 1.68-1.83 m (+ gold 1.62 m on Kyushu sets), grey lower band below 0.9 m */
+  if(liv==='noz'){lon(1.83,mul(HS,3.2),1.2);lon(1.68,mul(HS,3.2),1.2);}
+  else{const nv=mul([.08,.2,.75],3);lon(1.83,nv,10.2);lon(1.68,nv,10.2);lon(1.62,[1.7,1.2,.3],10.2);}
+  lon(.9,mul(HB,.45),.8);
+  const end=nf||nr,doors=end?[xAt(9.05),nf?-len/2+3.3:len/2-3.3]:[-len/2+1.6,len/2-1.6];
+  for(const d of doors){rect(d-.36,d+.36,1.38,3.16,mul(HB,1.2));rect(d-.16,d+.16,2.4,2.9,mul(HB,.8));}
+  if(end){const a=xAt(8.4),b=xAt(7.8);rect(Math.min(a,b),Math.max(a,b),1.4,3.1,mul(HB,1.1));rect(Math.min(a,b)+.12,Math.max(a,b)-.12,2.5,3.0,mul(HC,1.4));}
   const wx0=Math.min(...doors)+1.3,wx1=Math.max(...doors)-1.3;
-  for(let x=wx0;x<=wx1;x+=1.04)rect(x-.28,x+.28,1.98,2.46,mul(HB,.85));
-  if(nf||nr){const cc=mul(HC,2.4);let p=null;for(let k=0;k<=N7GLASS.length;k++){const [d,z]=N7GLASS[k%N7GLASS.length],q=pt(d,z,.05);if(p)S.add(p,q,cc);p=q;}
-   {const x0=xAt(8.3),x1=xAt(9.0);rect(Math.min(x0,x1),Math.max(x0,x1),2.3,2.75,mul(HC,1.4));}
-   for(const th of[.42,Math.PI-.42]){let p=null;for(let k=0;k<=30;k++){const x=xAt(10.2*k/30),q=sec(th,P(x),.03),v=[x,q[1],q[0]];if(p)S.add(p,v,mul(HB,1.5));p=v;}}
-   p=null;for(let k=0;k<=12;k++){const q=pt(5.1*k/12,0,.03);if(p)S.add(p,q,mul(HB,1.2));p=q;}}}};}
+  for(let x=wx0;x<=wx1;x+=1.06)rect(x-.26,x+.26,2.17,2.69,mul(HB,.85));
+  if(!end)return;
+  const dense=(pts,closed)=>{const o=[],m=closed?pts.length:pts.length-1;for(let i=0;i<m;i++){const [z0,y0]=pts[i],[z1,y1]=pts[(i+1)%pts.length],n=Math.max(1,Math.ceil(Math.hypot(z1-z0,y1-y0)/.04));for(let k=0;k<n;k++)o.push([z0+(z1-z0)*k/n,y0+(y1-y0)*k/n]);}if(!closed)o.push(pts[pts.length-1]);return o;};
+  const curve=(pts0,col,closed)=>{const pts=dense(pts0,closed);let p=null,first=null;for(const [z,y] of pts){const q=pf(z,y);if(!q){p=null;continue;}if(p)S.add(p,q,col);else first=q;p=q;}if(closed&&p&&first)S.add(p,first,col);};
+  const ell=(cz,cy,rz,ry,ex,n=32)=>{const o=[];for(let k=0;k<n;k++){const a=k/n*Math.PI*2,c=Math.cos(a),s=Math.sin(a);o.push([cz+rz*Math.sign(c)*Math.pow(Math.abs(c),2/ex),cy+ry*Math.sign(s)*Math.pow(Math.abs(s),2/ex)]);}return o;};
+  /* windscreen (front view 1.48 m wide, 2.45-3.03 m) and its frame */
+  curve(ell(0,2.74,.74,.29,3.2,40),mul(HC,2.4),true);curve(ell(0,2.74,.66,.23,3.2,40),mul(HC,1.0),true);
+  curve([[.05,2.5],[.3,2.68],[.55,2.82]],mul(HB,.8));
+  /* the "double wing": two pairs of ridges sweeping from the roof corners down to the nose */
+  for(const sd of[-1,1]){curve(N7FV.outer.map(([z,y])=>[sd*z,y]),mul(HB,1.6));curve(N7FV.inner.map(([z,y])=>[sd*z,y]),mul(HB,1.25));}
+  /* headlights and the lower nose oval */
+  for(const sd of[-1,1])curve(ell(sd*1.08,1.34,.15,.08,2,20),mul(HC,1.8),true);
+  curve(ell(0,.78,.97,.42,2.4,48),mul(HB,1.0),true);
+  let p=null;for(let k=0;k<=12;k++){const q=pt(3.6*k/12,0,.03);if(p)S.add(p,q,mul(HB,1.1));p=q;}}};}
 const M700N=buildModel(specN700('noz')),M700K=buildModel(specN700('kyu'));
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:new THREE.Vector3(.55,.75,1).multiplyScalar(2.2)},uScale:U.uScale,uMul:{value:1}},
@@ -458,7 +477,7 @@ for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
   for(const k of['m0','m1','m2','m3']){at[k]=new THREE.InstancedBufferAttribute(new Float32Array(NMAX*4),4).setUsage(DYN);ig.setAttribute(k,at[k]);}
   at.ik=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);ig.setAttribute('ik',at.ik);ig.instanceCount=0;
   const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}
-const N7X=27/2-1.0,N7q=M700N.sec(-.1,M700N.prof(N7X,27,true,false),.06),N7L=[N7q[1],Math.abs(N7q[0])*.75];
+const N7q=M700N.frontPoint(27,true,false,1.08,1.34)||[27/2-.8,1.34,1.08],N7X=N7q[0]+.05,N7L=[N7q[1],Math.abs(N7q[2])];
 const DET2=3500*3500;let detailOK=true;
 function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.type==='nozomi'?'noz':'kyu'][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
  const rx=P.cx-ORG.x,ry=P.cy-ORG.y,rz=P.cz-ORG.z,i=Lt.n++,j=i*4,a=Lt.at;
