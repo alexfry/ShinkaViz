@@ -415,17 +415,17 @@ const M500=buildModel(SPEC500);
 /* N700 family (N700A on Nozomi, 7000/8000 series on Sakura and Kodama). Fitted to an N700 Sakura design drawing
    (27.35 m end car: 6.1 m tip to bogie, 17.5 m bogie centres, 2.5 m wheelbase, 3.36 x 3.6 m section; measured at 38.3 px/m).
    Nose contours are traced in the front view and projected back onto the nose surface. */
-/* Creases as 3D curves, by matching side-view (d, height) and front-view (z, height) lines at equal heights.
-   A: the wing edge (tip -> roof corner); B: the cab hump edge (tip -> roof). Rows: [d, z, height]. */
-const N7A=[[.05,.19,1.0],[.3,.45,1.45],[1.8,.78,1.91],[5.3,1.07,2.49],[7.8,1.23,3.07],[9.5,1.29,3.48],[10.7,1.3,3.52]];
-const N7B=[[.08,.1,1.07],[.45,.23,1.52],[1.6,.48,1.97],[3.6,.71,2.42],[6,.83,3.0],[9.7,.87,3.52],[10.7,.87,3.56]];
+/* Nose features as 3D curves [d, z, height], by matching the drawing's side view (d, height) and front view (z, height) at equal
+   heights. B: the cab hump's U-shaped edge (starts on the centreline 2.2 m back); A1/A2: the double wing creases from the roof
+   corners down to the chin; L: the lower crease across the front above the headlights. */
+const N7A1=[[0,.16,.8],[.02,.18,.85],[.12,.28,1.16],[.45,.54,1.52],[1.6,.85,1.88],[3,1.16,2.3],[7,1.4,2.81],[8.6,1.5,3.33],[10.7,1.5,3.45]];
+const N7A2=[[.02,.1,.85],[.15,.18,1.21],[.55,.39,1.57],[2,.67,1.98],[5.2,.98,2.45],[7.6,1.19,2.97],[9.2,1.24,3.43],[10.7,1.24,3.5]];
+const N7B=[[0,0,0],[2.2,0,2.12],[2.4,.34,2.16],[3,.65,2.29],[4.4,.83,2.55],[6.6,.86,3.07],[9.6,.85,3.48],[10.7,.85,3.56]];
+const N7LC=[[.36,0],[.45,.4],[.8,.8],[1.2,1.2],[1.8,1.55],[2.6,1.66]];
 const col3=(T,k)=>T.map(r=>[r[0],r[k]]);
-const N7=d=>{const A=[tab(col3(N7A,1),d),tab(col3(N7A,2),d)],B=[tab(col3(N7B,1),d),tab(col3(N7B,2),d)];return {A,B};};
-/* window on the cab hump's front slope, in plan [d, z]; rear edge is the brow */
-const N7WIN=(()=>{const o=[];for(let k=0;k<=16;k++){const z=-.74+1.48*k/16;o.push([3.75+.85*Math.pow(Math.abs(z)/.74,2.2),z]);}
- for(const [d,z] of[[4.95,.76],[5.3,.75],[5.55,.68]])o.push([d,z]);
- for(let k=0;k<=16;k++){const z=.62-1.24*k/16;o.push([5.75-.1*Math.pow(Math.abs(z)/.74,2),z]);}
- for(const [d,z] of[[5.55,-.68],[5.3,-.75],[4.95,-.76]])o.push([d,z]);return o;})();
+const N7=d=>({A:[tab(col3(N7A1,1),d),tab(col3(N7A1,2),d)],B:[tab(col3(N7B,1),d),tab(col3(N7B,2),d)]});
+/* windscreen, front view [z, height]: mask shape with raised corner "ears"; frames split it into a centre pane and two corner panes */
+const N7WINF=[[-.78,2.74],[-.74,2.94],[-.65,3.02],[-.53,3.03],[-.44,2.97],[-.23,2.93],[0,2.92],[.23,2.93],[.44,2.97],[.53,3.03],[.65,3.02],[.74,2.94],[.78,2.74],[.72,2.56],[.6,2.46],[.29,2.42],[0,2.39],[-.29,2.42],[-.6,2.46],[-.72,2.56]];
 function specN700(liv){return {LN:10.7,KH:26,NU:4,skirt:.21,waist:.41,bog:[6.1,23.6],nl:()=>4,
  TAB_W:[[0,.3],[.06,.48],[.28,1.0],[.63,1.28],[1.15,1.44],[2.02,1.55],[2.89,1.6],[3.76,1.64],[4.98,1.67],[6,1.68],[10.7,1.68]],
  TAB_T:[[0,.99],[.05,1.17],[.1,1.28],[.16,1.36],[.26,1.49],[.37,1.59],[.52,1.7],[.78,1.78],[1.04,1.85],[1.31,1.93],[1.57,1.98],[2.09,2.09],[2.61,2.22],[3.13,2.32],[3.66,2.43],[4.2,2.57],[4.7,2.68],[5.2,2.8],[5.7,2.93],[6.27,3.12],[6.79,3.3],[7.31,3.37],[8.09,3.45],[8.88,3.52],[9.4,3.55],[10.2,3.58],[10.7,3.6]],
@@ -433,7 +433,7 @@ function specN700(liv){return {LN:10.7,KH:26,NU:4,skirt:.21,waist:.41,bog:[6.1,2
  TAB_B:[[0,.55],[.1,.5],[.2,.42],[.5,.4],[.75,.29],[1,.21],[10.7,.21]],
  HW:[[0,.8],[.7,1.42],[1.5,1.47],[9.5,1.62],[10.7,1.62]],
  section(d,yb){const W=tab(this.TAB_W,d),Tc=tab(this.TAB_T,d)+tab(this.TAB_C,d),hW=Math.max(yb+.1,tab(this.HW,d)),{A,B}=N7(d);
-  const zB=Math.min(B[0],W*.6),hB=Math.min(B[1],Tc-.005),zA=Math.min(Math.max(A[0],zB+.06),W*.9),hA=Math.min(A[1],hB-.03);
+  const hump=d>=2.2,zB=hump?Math.min(B[0],W*.6):.02,hB=hump?Math.min(B[1],Tc-.005):Tc-.002,zA=Math.min(Math.max(A[0],zB+.06),W*.9),hA=Math.min(A[1],hB-.03);
   const P=[[0,Tc],[zB*.5,Tc-(Tc-hB)*.3],[zB,hB],[zA,hA],[zA+(W-zA)*.55,hA-(hA-hW)*.08],[zA+(W-zA)*.92,hA-(hA-hW)*.42],[W,hW],[W*.97,yb+(hW-yb)*.35],[W*.86,yb],[W*.43,yb],[0,yb]];
   for(let i=1;i<P.length;i++)if(P[i][1]>P[i-1][1]&&i>2)P[i][1]=P[i-1][1]-.001;return P;},
  decorate({S,P,len,nf,nr,xAt,lon,rect,pt,pf,zOn}){
@@ -448,21 +448,26 @@ function specN700(liv){return {LN:10.7,KH:26,NU:4,skirt:.21,waist:.41,bog:[6.1,2
   for(let x=wx0;x<=wx1;x+=1.06)rect(x-.26,x+.26,2.17,2.69,mul(HB,.85));
   if(!end)return;
   const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
-  /* the creases themselves, both sides, from the tip back to the body */
-  const self=this;for(const sd of[-1,1])for(const [k,c] of[[3,mul(HB,1.7)],[2,mul(HB,1.35)]]){const o=[];for(let d=.06;d<=10.7;d+=.1){const x=xAt(d),C=self.section(d,P(x)[1])[k];o.push([x,C[1]+.025,sd*(C[0]+.025)]);}poly(o,c);}
-  /* windscreen on the hump's front slope; rear edge = brow (doubled to read as the overhang) */
-  const onTop=(d,z,g)=>{const x=xAt(d);return [x,P(x).half?(()=>{const p=P(x),H=p.half,a=Math.abs(z);for(let i=0;i<p.wi;i++){const [z0,y0]=H[i],[z1,y1]=H[i+1];if(a>=z0&&a<=z1)return y0+(y1-y0)*(a-z0)/((z1-z0)||1)+g;}return H[p.wi][1]+g;})():0,z];};
-  poly(N7WIN.map(([d,z])=>onTop(d,z,.04)),mul(HC,2.6),true);
-  poly(N7WIN.map(([d,z])=>onTop(3.75+(d-3.75)*.9+.12,z*.88,.04)),mul(HC,1.0),true);
-  {const o=[];for(let k=0;k<=20;k++){const z=-.8+1.6*k/20;o.push(onTop(5.9-.1*Math.pow(Math.abs(z)/.8,2),z,.06));}poly(o,mul(HB,1.8));}
-  poly([[4.1,.05],[4.5,.3],[4.9,.5]].map(([d,z])=>onTop(d,z,.08)),mul(HB,.8));
-  /* headlight slots (side view d 0.7-1.45, h 1.31-1.46), on the flank */
-  for(const sd of[-1,1]){const o=[];for(let k=0;k<=24;k++){const a=k/24*Math.PI*2,d=1.08+.37*Math.cos(a),h=1.385+.075*Math.sin(a),x=xAt(d),z=zOn(x,h);o.push(z===null?null:[x,h,sd*(z+.01)]);}poly(o,mul(HC,1.8),true);}
+  /* surface helpers: upper-surface height at (d, z); d at which the upper surface reaches height h at lateral z */
+  const self=this,yAt=(d,z)=>{const x=xAt(d),p=P(x),H=p.half,a=Math.abs(z);for(let i=0;i<p.wi;i++){const [z0,y0]=H[i],[z1,y1]=H[i+1];if(a>=z0&&a<=z1)return y0+(y1-y0)*(a-z0)/((z1-z0)||1);}return H[p.wi][1];};
+  const onS=(d,z,g=.03)=>[xAt(d),yAt(d,z)+g,z*1.004];
+  const dFor=(z,h,d0,d1)=>{let lo=d0,hi=d1;if(yAt(hi,z)<h)return null;for(let k=0;k<30;k++){const m=(lo+hi)/2;if(yAt(m,z)<h)lo=m;else hi=m;}return hi;};
+  const cr=(T,col,from=0)=>{for(const sd of[-1,1]){const o=[];const d0=Math.max(from,T[0][0]),d1=T[T.length-1][0];for(let d=d0;d<=d1+1e-6;d+=.08){o.push(onS(d,sd*tab(col3(T,1),d)));}poly(o,col);}};
+  cr(N7A1,mul(HB,1.7));cr(N7A2,mul(HB,1.3));cr(N7B,mul(HB,1.5),2.2);
+  {const o=[];for(let k=0;k<=24;k++){const z=-1.66+3.32*k/24,a=Math.abs(z),d=tab(N7LC.map(r=>[r[1],r[0]]),a);o.push(onS(d,z,.03));}poly(o,mul(HB,1.1));}
+  /* windscreen: front-view outline placed where the hump surface reaches each (z, height) */
+  const win=N7WINF.map(([z,h])=>{const d=dFor(z,h,2.5,8);return d===null?null:onS(d,z,.05);});
+  poly(win,mul(HC,2.6),true);
+  for(const zp of[-.44,.44]){const o=[];for(let k=0;k<=8;k++){const h=2.44+(2.97-2.44)*k/8,d=dFor(zp,h,2.5,8);o.push(d===null?null:onS(d,zp,.06));}poly(o,mul(HC,1.6));}
+  {const o=[];for(let k=0;k<=20;k++){const z=-.8+1.6*k/20,h=tab([[0,2.96],[.23,2.97],[.44,3.01],[.53,3.07],[.8,3.0]],Math.abs(z)),d=dFor(z,h,2.5,8.5);o.push(d===null?null:onS(d+.05,z,.08));}poly(o,mul(HB,1.8));}
+  poly([[.06,2.45],[.25,2.62],[.4,2.78]].map(([z,h])=>{const d=dFor(z,h,2.5,8);return d===null?null:onS(d,z,.09);}),mul(HB,.8));
+  /* headlight slots (plan view: d 0.8-1.5, z ~0.95, angled along the outline; side view height ~1.38 m) */
+  for(const sd of[-1,1]){const o=[];for(let k=0;k<=24;k++){const a=k/24*Math.PI*2,u=.36*Math.cos(a),v=.07*Math.sin(a),d=1.15+u*.94-v*.34,z=sd*(.95+u*.34+v*.94);o.push(onS(d,z,.03));}poly(o,mul(HC,1.8),true);}
   /* waist line from the headlights back, and the lower line beneath it */
   for(const sd of[-1,1])for(const [T,c] of[[[[.7,1.45],[1.5,1.47],[9.5,1.62]],mul(HB,.9)],[[[1.2,1.3],[7.8,1.5]],mul(HB,.6)]]){const o=[];for(let d=T[0][0];d<=T[T.length-1][0];d+=.15){const h=tab(T,d),x=xAt(d),z=zOn(x,h);o.push(z===null?null:[x,h,sd*z]);}poly(o,c);}
   /* lower nose oval (front view: +-0.97 m, 0.36-1.2 m), on the forward-facing cap */
-  {const o=[];for(let k=0;k<48;k++){const a=k/48*Math.PI*2;o.push(pf(.97*Math.cos(a),.78+.42*Math.sin(a)));}poly(o,mul(HB,1.0),true);}
-  {let p=null;for(let k=0;k<=12;k++){const q=onTop(3.7*k/12,0,.03);if(p)S.add(p,q,mul(HB,1.1));p=q;}}}};}
+  {const o=[];for(let k=0;k<64;k++){const a=k/64*Math.PI*2;o.push(pf(1.25*Math.cos(a),.85+.64*Math.sin(a)));}poly(o,mul(HB,1.0),true);}
+  {let p=null;for(let k=0;k<=12;k++){const q=onS(2.2*k/12,0,.03);if(p)S.add(p,q,mul(HB,1.1));p=q;}}}};}
 const M700N=buildModel(specN700('noz')),M700K=buildModel(specN700('kyu'));
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:new THREE.Vector3(.55,.75,1).multiplyScalar(2.2)},uScale:U.uScale,uMul:{value:1}},
@@ -506,7 +511,7 @@ for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
   for(const k of['m0','m1','m2','m3']){at[k]=new THREE.InstancedBufferAttribute(new Float32Array(NMAX*4),4).setUsage(DYN);ig.setAttribute(k,at[k]);}
   at.ik=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);ig.setAttribute('ik',at.ik);ig.instanceCount=0;
   const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}
-const N7X=27/2-1.0,N7L=[1.385,(M700N.prof(N7X,27,true,false).half?(()=>{const p=M700N.prof(N7X,27,true,false);let m=0;for(let i=0;i<p.half.length-1;i++){const [z0,y0]=p.half[i],[z1,y1]=p.half[i+1];if((1.385-y0)*(1.385-y1)<=0&&y0!==y1)m=Math.max(m,z0+(z1-z0)*(1.385-y0)/(y1-y0));}return m;})():1.2)+.03];
+const N7X=27/2-1.15,N7p=M700N.prof(N7X,27,true,false),N7L=[M700N.topAt(N7p,.95,.05),.95];
 const DET2=3500*3500;let detailOK=true;
 function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.type==='nozomi'?'noz':'kyu'][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
  const rx=P.cx-ORG.x,ry=P.cy-ORG.y,rz=P.cz-ORG.z,i=Lt.n++,j=i*4,a=Lt.at;
