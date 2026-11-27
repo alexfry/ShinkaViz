@@ -68,7 +68,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 <div id="labels"></div>
 <div id="hud">
   <div class="card"><div id="clock">--:--:--</div><div class="k" id="cnt"></div><div id="shot"></div>
-    <div id="legend"><span><i style="background:#ffb347"></i>のぞみ Nozomi</span><span><i style="background:#ff5ce0"></i>さくら Sakura</span><span><i style="background:#5cff9a"></i>こだま Kodama</span><span><i style="background:#cfe6ff"></i>500系 500 series</span></div></div>
+    <div id="legend"><span><i style="background:#ffb347"></i>のぞみ Nozomi</span><span><i style="background:#fff066"></i>ひかり Hikari</span><span><i style="background:#ff6a6a"></i>みずほ Mizuho</span><span><i style="background:#ff5ce0"></i>さくら Sakura</span><span><i style="background:#5cff9a"></i>こだま Kodama</span><span><i style="background:#cfe6ff"></i>500系 500 series</span></div></div>
   <div class="card" id="board" hidden><h1>発車案内 Departures</h1><div class="k" id="boardTitle"></div><table><tbody id="boardRows"></tbody></table></div>
   <div class="card" id="hero"><h1><span id="tJa">こだま · 500系</span> <span class="k" id="tEn" style="font-weight:400">Kodama · 500 series</span></h1><div class="g">
     <span class="k">速度 Speed</span><span class="v" id="spd"></span>
@@ -89,6 +89,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="data/sanyo-line.js"></script>
 <script src="data/sanyo-context.js"></script>
+<script src="data/sanyo-timetable.js"></script>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -538,10 +539,12 @@ const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:
  fragmentShader:`uniform vec3 uCol;uniform float uScale,uMul,uCut;varying float vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*uMul,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
 const heroMat=lineMat({nofade:true}),trainMat=lineMat({nofade:true});
 const HCL=[27,25,25,25,25,25,25,27];
-const heroCars=HCL.map((L,c)=>{const nf=c===0,nr=c===7,geo=M500.carGeo(L,nf,nr),g=new THREE.Group();g.matrixAutoUpdate=false;
+/* 500 series sets, made as needed (one per 500 running at once) */
+const G500=HCL.map((L,c)=>M500.carGeo(L,c===0,c===7)),SETS500=[];
+function set500(i){while(SETS500.length<=i)SETS500.push(HCL.map((L,c)=>{const nf=c===0,nr=c===7,geo=G500[c],g=new THREE.Group();g.matrixAutoUpdate=false;
  const lm=lineMat({nofade:true}),hm=hullMat.clone();for(const k of['uPix','uCol','uScale','uCut'])hm.uniforms[k]=hullMat.uniforms[k];g.userData={lm,hm,k:1};
  const o=new THREE.Mesh(geo,occMat),h=new THREE.Mesh(geo,hm),l=M500.carLines(L,nf,nr,c===2?5:c===5?-5:null).mesh(lm,1);
- o.layers.set(1);h.layers.set(1);o.frustumCulled=h.frustumCulled=false;g.add(o,h,l);scene.add(g);return g;});
+ o.layers.set(1);h.layers.set(1);o.frustumCulled=h.frustumCulled=false;g.add(o,h,l);scene.add(g);return g;}));return SETS500[i];}
 const HLX=27/2-1.0,HLq=M500.sec(-.25,M500.prof(HLX,27,true,false),.06),HL=[[HLX,HLq[1],Math.abs(HLq[0])*.8],[HLX,HLq[1],-Math.abs(HLq[0])*.8]];
 
 /* ---------- dynamic trains, occluders, lights ---------- */
@@ -577,7 +580,7 @@ for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
   const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}
 const N7X=27/2-1.1,N7L=[1.42,1.08];
 const DET2=3500*3500;let detailOK=true;
-function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.type==='nozomi'?'noz':'kyu'][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
+function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.liv||(tr.type==='nozomi'?'noz':'kyu')][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
  const rx=P.cx-ORG.x,ry=P.cy-ORG.y,rz=P.cz-ORG.z,i=Lt.n++,j=i*4,a=Lt.at;
  a.m0.array[j]=P.fx;a.m0.array[j+1]=P.fy;a.m0.array[j+2]=P.fz;a.m0.array[j+3]=0;a.m1.array[j]=P.ux;a.m1.array[j+1]=P.uy;a.m1.array[j+2]=P.uz;a.m1.array[j+3]=0;
  a.m2.array[j]=P.sx;a.m2.array[j+1]=P.sy;a.m2.array[j+2]=P.sz;a.m2.array[j+3]=0;a.m3.array[j]=rx;a.m3.array[j+1]=ry;a.m3.array[j+2]=rz;a.m3.array[j+3]=1;a.ik.array[i]=k;
@@ -590,7 +593,7 @@ function flushDetailed(){for(const liv of['noz','kyu'])for(const t in NT.lines[l
 const VK=285/3.6,VF=300/3.6,ACC=2.6/3.6,DEC=2.8/3.6;
 function segRun(d,v){const da=v*v/(2*ACC),db=v*v/(2*DEC);if(d>=da+db)return{v,T:v/ACC+v/DEC+(d-da-db)/v};const vp=Math.sqrt(2*d*ACC*DEC/(ACC+DEC));return{v:vp,T:vp/ACC+vp/DEC};}
 function segAt(t,d,g){const t1=g.v/ACC,t3=g.v/DEC;if(t<=0)return[0,0];if(t<t1)return[.5*ACC*t*t,ACC*t];if(t<g.T-t3)return[.5*ACC*t1*t1+g.v*(t-t1),g.v];if(t>=g.T)return[d,0];const r=g.T-t;return[d-.5*DEC*r*r,DEC*r];}
-const SV={nozomi:{cars:16,v:VF,col:[1.7,.95,.25]},sakura:{cars:8,v:VF,col:[1.5,.3,1.3]},kodama:{cars:8,v:VK,col:[.3,1.5,.65]}};
+const SV={nozomi:{cars:16,v:VF,col:[1.7,.95,.25]},hikari:{cars:16,v:VF,col:[1.6,1.5,.3]},mizuho:{cars:8,v:VF,col:[1.6,.35,.35]},sakura:{cars:8,v:VF,col:[1.5,.3,1.3]},tsubame:{cars:8,v:VK,col:[1.1,.6,1.6]},kodama:{cars:8,v:VK,col:[.3,1.5,.65]}};
 const STOPS={nozomi:['Shin-Osaka','Shin-Kobe','Okayama','Hiroshima','Kokura','Hakata'],sakura:['Shin-Osaka','Shin-Kobe','Himeji','Okayama','Fukuyama','Hiroshima','Shin-Yamaguchi','Kokura','Hakata']};
 const KI=n=>stations.findIndex(s=>s.name===n),LONGDW=new Set(['Okayama','Hiroshima','Kokura'].map(KI));
 function mkTrain(type,dir,hero){const sv=SV[type];let ks=type==='kodama'?stations.map((s,i)=>i):STOPS[type].map(KI);if(dir<0)ks=ks.slice().reverse();
@@ -609,10 +612,35 @@ function planKodama(tr,dep,fl){fl=fl.filter(f=>Math.abs(f.ev[0].dep-dep)<6*3600)
   if(j<n-1){const k2=tr.ks[j+1];e.d=Math.abs(PC[k2]-s);e.g=segRun(e.d,tr.v);
    for(let it=0;it<24;it++){let mv=false;const ka=e.dep+e.g.T;for(const f of fl){const ti=crossT(f,k,false);if(ti===null)continue;const to=crossT(f,k2,true);if(to===null)continue;if(ti>e.dep-60&&to<ka+75){e.dep=ti+100;mv=true;break;}}if(!mv)break;}}
   else e.dep=arr;tr.ev.push(e);}tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));}
-const fast=[],trains=[];let hero=null;
+/* the real timetable (data/sanyo-timetable.js, rebuilt daily by .github/workflows/timetable.yml); the invented sample is the fallback */
+const TT=window.SANYO_TT&&Array.isArray(window.SANYO_TT.trains)&&window.SANYO_TT.trains.length>20?window.SANYO_TT:null;
+const VMAX=300/3.6,RA=1/(2*ACC)+1/(2*DEC);
+/* cruise speed that covers d metres in the scheduled T seconds (accelerate, cruise, brake); capped at line speed */
+function fitRun(d,T){const D=T*T-4*RA*d;if(!(T>0)||D<=0)return segRun(d,VMAX);const v=Math.min(VMAX,(T-Math.sqrt(D))/(2*RA));return v>=VMAX-1e-6?segRun(d,VMAX):{v,T:d/v+RA*v};}
+const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama','名古屋':'Nagoya','京都':'Kyoto','熊本':'Kumamoto','鹿児島中央':'Kagoshima-Chuo','新鳥栖':'Shin-Tosu','久留米':'Kurume','筑後船小屋':'Chikugo-Funagoya','新大牟田':'Shin-Omuta','新玉名':'Shin-Tamana','新八代':'Shin-Yatsushiro','博多南':'Hakata-Minami'};
+function ttTrains(){const KJ=new Map(stations.map((s,i)=>[s.ja,i])),out=[];
+ for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
+  const type=SV[t.type]?t.type:'kodama',sv=SV[type],cars=Math.max(4,Math.min(16,t.cars||sv.cars)),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
+  const ks=st.map(x=>KJ.get(x[0])),dir=PC[ks[ks.length-1]]>PC[ks[0]]?1:-1,is500=t.stock==='500'&&cars===8;
+  const tr={type,dir,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
+   liv:cars>=16?'noz':'kyu',ev:[]};
+  st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:PC[k],arr:Math.min(arr,dep),dep});});
+  for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep);}
+  const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
+ return out;}
+const trains=TT?ttTrains():[];let hero=null;
+if(!trains.length){const fast=[];
 for(let h=6;h<22;h++)for(const [m,ty] of[[0,'nozomi'],[5,'sakura'],[20,'nozomi'],[40,'nozomi']]){const a=mkTrain(ty,1);planFixed(a,h*3600+m*60);const b=mkTrain(ty,-1);planFixed(b,h*3600+(m+3)*60);fast.push(a,b);}
 const fDown=fast.filter(f=>f.dir===1),fUp=fast.filter(f=>f.dir===-1);trains.push(...fast);
-for(let h=6;h<22;h++){const a=mkTrain('kodama',1,h===8);planKodama(a,h*3600+720,fDown);if(h===8)hero=a;const b=mkTrain('kodama',-1);planKodama(b,h*3600+1800,fUp);trains.push(a,b);}
+for(let h=6;h<22;h++){const a=mkTrain('kodama',1,h===8);planKodama(a,h*3600+720,fDown);if(h===8)hero=a;const b=mkTrain('kodama',-1);planKodama(b,h*3600+1800,fUp);trains.push(a,b);}}
+/* time of day in Japan, as seconds after midnight (the timetable day runs 04:00 to 03:59) */
+function jstNow(){const d=new Date(Date.now()+9*3600e3);let t=d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds();if(t<4*3600)t+=86400;return t;}
+const DAY0=Math.min(...trains.map(t=>t.ev[0].arr)),DAY1=Math.max(...trains.map(t=>t.ev[t.ev.length-1].arr));
+const runningAt=(tr,t)=>t>=tr.ev[0].arr&&t<=tr.ev[tr.ev.length-1].arr;
+/* who to follow: a 500 series if one is running, else a Kodama, else anything running; the earliest to start next if nothing is */
+function pickFocus(t){const run=trains.filter(tr=>runningAt(tr,t));const mid=tr=>-(Math.min(t-tr.ev[0].arr,tr.ev[tr.ev.length-1].arr-t));
+ const by=a=>a.sort((x,y)=>mid(x)-mid(y))[0];
+ return by(run.filter(tr=>tr.hero))||by(run.filter(tr=>tr.type==='kodama'))||by(run)||trains.slice().sort((x,y)=>(x.ev[0].arr-t+86400*2)%86400-(y.ev[0].arr-t+86400*2)%86400)[0];}
 function latFor(tr,s){const k=nearestK(s);let off=2.15;if(tr.stopSet.has(k))off+=(tr.type==='kodama'&&stations[k].major?14:5)*loopAmt(Math.abs(s-PC[k]));return tr.dir*off;}
 function pose(tr,cs,o){const sf=cs+tr.dir*8.5,sr=cs-tr.dir*8.5;at(sf,latFor(tr,sf),A);at(sr,latFor(tr,sr),B);
  let fx=A[0]-B[0],fy=A[1]-B[1],fz=A[2]-B[2];const l=Math.hypot(fx,fy,fz)||1;fx/=l;fy/=l;fz/=l;let sx=-fz,sz=fx;const sl=Math.hypot(sx,sz)||1;sx/=sl;sz/=sl;
@@ -632,12 +660,12 @@ function drawN700(tr,st){const head=st.s+tr.dir*tr.len/2,n=tr.cl.length;let acc=
   if(c===0)for(const z of[-.22,.22])light(P,h-.2,1.27,z,[5,5,4.6],4);
   if(c===n-1)for(const z of[-.22,.22])light(P,-h+.2,1.27,z,[4,.2,.1],3.5);}}
 let tf=1;
-function placeHero(st,dt){const head=st.s+hero.dir*hero.len/2;let acc=0;
- for(let c=0;c<8;c++){const L=hero.cl[c],cs=head-hero.dir*(acc+L/2);acc+=L+.6;const P=pose(hero,cs,c===0?HP0:PQ);
-  const g=heroCars[c];g.matrix.set(P.fx,P.ux,P.sx,P.cx,P.fy,P.uy,P.sy,P.cy,P.fz,P.uz,P.sz,P.cz,0,0,0,1);g.matrixWorldNeedsUpdate=true;
+function placeHero(tr,st,cars,dt){const head=st.s+tr.dir*tr.len/2;let acc=0;
+ for(let c=0;c<8;c++){const L=tr.cl[c],cs=head-tr.dir*(acc+L/2);acc+=L+.6;const P=pose(tr,cs,PQ);
+  const g=cars[c];g.visible=true;g.matrix.set(P.fx,P.ux,P.sx,P.cx,P.fy,P.uy,P.sy,P.cy,P.fz,P.uz,P.sz,P.cz,0,0,0,1);g.matrixWorldNeedsUpdate=true;
   if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);
   /* each car dims on its own as it passes a portal, eased over a few frames */
-  const u=g.userData,tg=(1-.78*P.tun)*(mode==='board'&&FT===hero&&OB.view==='front'?.4:1);u.k+=(tg-u.k)*Math.min(1,dt*8);u.lm.uniforms.uMul.value=u.k;u.hm.uniforms.uMul.value=u.k;}}
+  const u=g.userData,tg=(1-.78*P.tun)*(mode==='board'&&FT===tr&&OB.view==='front'?.4:1);u.k+=(tg-u.k)*Math.min(1,dt*8);u.lm.uniforms.uMul.value=u.k;u.hm.uniforms.uMul.value=u.k;}}
 function dot(tr,st){if(np>=MAXP)return;at(st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
 
 /* the followed train's own rails light up from its outermost wheels, forward (white) and back (red), fading over about a car length */
@@ -677,6 +705,7 @@ function pass(m,rt){quad.material=m;renderer.setRenderTarget(rt);renderer.render
 let mode='cine',speed=1,anim=null,ovf=0;
 const ORB={yaw:.55,pitch:.12,dist:40,min:12,max:2500000};
 const T=new THREE.Vector3(),hs0={s:0,v:0,stop:-1,i:0};
+if(!hero)hero=pickFocus(jstNow());
 let FT=hero,fs=hs0,FP0=HP0,lastHd=null;const FSX={s:0,v:0,stop:-1,i:0};
 const wrapA=d=>((d+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
 const ss=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
@@ -794,13 +823,17 @@ function setPlat(k,side){PLAT_CAM.k=k;PLAT_CAM.side=side;PLAT_CAM.yaw=0;PLAT_CAM
 {const sel=$('#plat');stations.forEach((s,k)=>{const o=document.createElement('option');o.value=String(k);o.textContent=`${s.ja} ${s.name}`;sel.appendChild(o);});
  sel.addEventListener('change',()=>setPlat(+sel.value,PLAT_CAM.side));$('#platSide').addEventListener('click',()=>setPlat(PLAT_CAM.k,-PLAT_CAM.side));}
 /* departure board for the platform you're on */
-const SVN={nozomi:['のぞみ','Nozomi'],sakura:['さくら','Sakura'],kodama:['こだま','Kodama']};let boardT=0;
+const SVN={nozomi:['のぞみ','Nozomi'],hikari:['ひかり','Hikari'],mizuho:['みずほ','Mizuho'],sakura:['さくら','Sakura'],tsubame:['つばめ','Tsubame'],kodama:['こだま','Kodama']};
+/* name with number ("のぞみ 1号", "Nozomi 1"), destination beyond the Sanyo line where known, and rolling stock */
+const tName=tr=>{const n=SVN[tr.type];return tr.num?[`${n[0]}${tr.num}号`,`${n[1]} ${tr.num}`]:n;};
+const tDest=tr=>tr.dest?{ja:tr.dest,name:DEST_EN[tr.dest]||(stations.find(x=>x.ja===tr.dest)||{}).name||tr.dest}:stations[tr.ks[tr.ks.length-1]];
+const tStock=tr=>tr.hero?['500系','500 series']:tr.stock==='700'?['700系','700 series']:tr.stock==='N700S'?['N700S','N700S']:tr.stock==='N700A'?['N700A','N700A']:tr.stock==='800'?['800系','800 series']:(tr.liv||(tr.type==='nozomi'?'noz':'kyu'))==='noz'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];let boardT=0;
 function updBoard(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,rows=[];
  for(const tr of trains){if(tr.dir!==sd)continue;const ev=tr.ev;if(ev[ev.length-1].arr<simT-60||ev[0].arr>simT+5400)continue;
   const e=tr.evByK.get(k);let t;if(e){if(e.dep<simT-5)continue;t=e===ev[0]?e.dep:e.arr;}else{t=crossT(tr,k,false);if(t===null||t<simT-5)continue;}rows.push({t,e,tr});}
  rows.sort((a,b)=>a.t-b.t);const st=stations[k];$('#boardTitle').textContent=`${st.ja} ${st.name} · ${sd>0?'下り Hakata-bound':'上り Shin-Osaka-bound'}`;
  const tb=$('#boardRows');tb.textContent='';
- for(const r of rows.slice(0,5)){const tr=r.tr,n=SVN[tr.type],dest=stations[tr.ks[tr.ks.length-1]],e=r.e;let status;
+ for(const r of rows.slice(0,5)){const tr=r.tr,n=tName(tr),dest=tDest(tr),e=r.e;let status;
   if(e&&simT>=e.arr&&simT<=e.dep)status='停車中 At platform';else if(!e)status=r.t-simT<90?'まもなく通過 Passing now':'通過 Passing';else if(e===tr.ev[tr.ev.length-1])status='終着 Terminates';else status=r.t-simT<90?'まもなく到着 Arriving':'停車 Stops';
   const tm=e&&e!==tr.ev[tr.ev.length-1]?e.dep:r.t,tr_=document.createElement('tr');
   for(const [txt,cls] of[[hm(tm),'v'],[`${n[0]} ${n[1]}${tr.hero?' · 500系':''}`,''],[`${dest.ja} ${dest.name}`,''],[status,e?'':'k']]){const td=document.createElement('td');td.textContent=txt;if(cls)td.className=cls;tr_.appendChild(td);}
@@ -816,13 +849,13 @@ $('#timeGrp .cur').textContent='1×';$('#speeds').addEventListener('click',e=>{c
 const pers=$('#pers'),glow=$('#glow');
 
 function setFocus(tr){if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
- if(tr===hero){fs=hs0;FP0=HP0;}else{fs={s:0,v:0,stop:-1,i:0};FP0={...HP0};const st=stateAt(tr,simT,FSX);if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(tr,st.s+tr.dir*(tr.len/2-tr.cl[0]/2),FP0);}}
+ {fs={s:0,v:0,stop:-1,i:0};FP0={...HP0};const st=stateAt(tr,simT,FSX);if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(tr,st.s+tr.dir*(tr.len/2-tr.cl[0]/2),FP0);}}
  clearP=true;cine.shot=null;anim=null;$('#trainSel').value=String(trains.indexOf(tr));selKey='';}
 /* train selector: every running train, down trains first, in departure order */
 let selKey='',selT=0;
 function updTrainSel(){const act=trains.filter(tr=>tr===FT||stateAt(tr,simT,FSX)).sort((a,b)=>b.dir-a.dir||a.ev[0].dep-b.ev[0].dep),key=act.map(tr=>trains.indexOf(tr)).join(',');
  if(key===selKey)return;selKey=key;const sel=$('#trainSel');sel.textContent='';
- for(const tr of act){const o=document.createElement('option'),n=SVN[tr.type],dest=stations[tr.ks[tr.ks.length-1]];o.value=String(trains.indexOf(tr));
+ for(const tr of act){const o=document.createElement('option'),n=tName(tr),dest=tDest(tr);o.value=String(trains.indexOf(tr));
   o.textContent=`${tr.dir>0?'▼':'▲'} ${n[0]} ${n[1]}${tr.hero?' · 500系':''} ${hm(tr.ev[0].dep)} → ${dest.ja} ${dest.name}`;sel.appendChild(o);}
  sel.value=String(trains.indexOf(FT));}
 $('#trainSel').addEventListener('change',e=>setFocus(trains[+e.target.value]));
@@ -835,18 +868,21 @@ function updLabels(){const W=window.innerWidth,H=window.innerHeight;for(let k=0;
  if(!show){el.style.display='none';continue;}el.style.display='';el.style.transform=`translate(${((v3.x*.5+.5)*W).toFixed(1)}px,${((-v3.y*.5+.5)*H).toFixed(1)}px) translate(-50%,-125%)`;el.style.opacity=ovf>.3?1:Math.max(0,1-dist/20000).toFixed(2);}}
 const pad=n=>String(n).padStart(2,'0'),fmt=t=>{t=((t%86400)+86400)%86400;return `${pad(t/3600|0)}:${pad((t/60|0)%60)}:${pad(t%60|0)}`;},hm=t=>fmt(t).slice(0,5);
 const E={clock:$('#clock'),cnt:$('#cnt'),spd:$('#spd'),stat:$('#stat'),next:$('#next'),km:$('#km')};let hudT=0,active=0;
-function updHud(){const h=fs,ev=FT.ev,n=SVN[FT.type],md=FT.hero?['500系','500 series']:FT.type==='nozomi'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`+(LIVE?` · tiles ${LTM.ready}/${LTM.want}`:'');E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
+function updHud(){const h=fs,ev=FT.ev,n=tName(FT),md=tStock(FT);$('#tJa').textContent=`${n[0]} · ${md[0]}`;$('#tEn').textContent=`${n[1]} · ${md[1]}`;E.clock.textContent=fmt(simT);E.cnt.textContent=`${active} trains running`+(LIVE?` · tiles ${LTM.ready}/${LTM.want}`:'');E.spd.textContent=`${Math.round(h.v*3.6)} km/h`;
  if(h.stop>=0){const e=ev[h.i];E.stat.textContent=simT<e.dep?`${nm(h.stop)}, leaves ${hm(e.dep)}`:`At ${nm(h.stop)}`;}else E.stat.textContent=TUN[trk(h.s).i]?'トンネル In tunnel':'走行中 Running';
  const ne=ev[h.i+1];E.next.textContent=ne?`${nm(ne.k)} ${hm(ne.arr)}`:'終点 Terminus';E.km.textContent=`${(h.s/1000).toFixed(1)} km from Shin-Osaka`;}
 
 /* ---------- frame loop ---------- */
-let simT=hero.ev[3].dep+100,last=performance.now();
+/* the clock: real time in Japan when the real timetable is loaded (jumping to the next train if none is running), else the sample day */
+let simT=TT?(trains.some(tr=>runningAt(tr,jstNow()))?jstNow():hero.ev[0].arr+5):hero.ev[3].dep+100,last=performance.now();
+if(TT)setFocus(pickFocus(simT));
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0,(now-last)/1000));last=now;simT+=dt*speed;U.uTime.value=now/1000;
- const he=hero.ev;if(simT>he[he.length-1].arr+90){simT=he[0].dep-20;clearP=true;}
+ if(TT){if(simT>DAY1+120){simT=DAY0;clearP=true;}}else{const he=hero.ev;if(simT>he[he.length-1].arr+90){simT=he[0].dep-20;clearP=true;}}
  nv=0;np=0;ni=0;active=0;const so={s:0,v:0,stop:-1,i:0};ORG.copy(cam.position);detailOK=ovf<.5;resetDetailed();
- for(const tr of trains){const st=stateAt(tr,simT,so);if(!st)continue;active++;if(tr.hero){hs0.s=st.s;hs0.v=st.v;hs0.stop=st.stop;hs0.i=st.i;placeHero(st,dt);}else drawN700(tr,st);dot(tr,st);}
+ let n5=0;for(const tr of trains){const st=stateAt(tr,simT,so);if(!st)continue;active++;if(tr.hero)placeHero(tr,st,set500(n5++),dt);else drawN700(tr,st);dot(tr,st);}
+ for(let i=n5;i<SETS500.length;i++)for(const g of SETS500[i])g.visible=false;
  flushDetailed();
- if(FT!==hero){const st=stateAt(FT,simT,FSX);if(!st)setFocus(hero);else{fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(FT,st.s+FT.dir*(FT.len/2-FT.cl[0]/2),FP0);}}
+ {let st=stateAt(FT,simT,FSX);if(!st){const nx=pickFocus(simT);if(nx!==FT){setFocus(nx);st=stateAt(FT,simT,FSX);}}if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(FT,st.s+FT.dir*(FT.len/2-FT.cl[0]/2),FP0);}}
  dG.setDrawRange(0,nv);dG.attributes.position.needsUpdate=true;dG.attributes.col.needsUpdate=true;io.count=ni;io.instanceMatrix.needsUpdate=true;
  pG.setDrawRange(0,np);for(const k of['position','col','sz','kind'])pG.attributes[k].needsUpdate=true;
  updCam(now);updModeUi();liveUpdate(now);if(ovf<.9)patch(FP0.cx,FP0.cz);railGlow();
@@ -872,6 +908,7 @@ window.addEventListener('resize',resize);
  const arm=()=>{clearTimeout(tm);document.body.classList.remove('calm');if(on)tm=setTimeout(()=>{if(!document.querySelector('#layers[open]'))document.body.classList.add('calm');else arm();},3000);};
  cb.addEventListener('change',()=>{on=cb.checked;try{localStorage.setItem('shinkaviz-calm',on?'1':'0');}catch(e){}arm();});
  for(const ev of['pointermove','pointerdown','wheel','keydown','touchstart'])window.addEventListener(ev,arm,{passive:true});arm();}
+if(TT){const tx=`Timetable: JR West, ${TT.date}; train positions are worked out from it, not tracked live.`;$('#liveNote').textContent=tx;$('#procNote').textContent='Terrain is procedural. '+tx;}
 $('#src').textContent=SRC_NOTE;$('#procNote').hidden=!!LIVE;$('#liveNote').hidden=!LIVE;$('#credit').hidden=!LINE;if(LIVE)$('#credFull').textContent='Map data © OpenStreetMap contributors. Vector tiles: OpenFreeMap © OpenMapTiles. Terrain: Terrain Tiles (Mapzen, AWS Open Data).';resize();msg.remove();requestAnimationFrame(frame);
 }
 }

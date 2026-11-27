@@ -1,0 +1,59 @@
+# Rebuilds data/sanyo-timetable.js every morning (Japan time) from JR West's timetable site, commits it if it changed,
+# and asks GitHub Pages to republish. Run it by hand from the Actions tab ("Run workflow") to refresh now.
+name: Timetable
+
+on:
+  schedule:
+    - cron: '17 19 * * *'      # 04:17 JST, just after the timetable site's day rolls over at 04:00
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to fetch (YYYYMMDD, Japan). Leave empty for today.'
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: timetable
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the day's timetable
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
+          python3 tools/build_timetable.py $ARGS --dump tools/.cache/pages
+
+      - name: Keep raw pages if parsing failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timetable-pages
+          path: tools/.cache/pages
+          retention-days: 7
+
+      - name: Commit if changed
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/sanyo-timetable.js
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git commit -m "Timetable for $(date -u -d '+9 hours' +%Y-%m-%d)"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # pushes made with the workflow token don't start a Pages build on their own
+      - name: Republish GitHub Pages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages build request failed; it will publish on the next push."

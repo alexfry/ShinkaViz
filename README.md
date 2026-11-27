@@ -78,3 +78,14 @@ OpenStreetMap data is © OpenStreetMap contributors under the ODbL; the page sho
 4. Draw persistence trails as world-space lines, so orbiting doesn't smear.
 5. Add higher-detail N700 / N700S models and correct consists.
 6. Extend to the Tokaido line, then the rest of the network.
+
+## Timetable
+
+`data/sanyo-timetable.js` holds the real timetable for one day: every Sanyo Shinkansen train with its stops, times, rolling stock and car count. It is rebuilt every morning (Japan time) by the **Timetable** GitHub Action (`.github/workflows/timetable.yml`), which runs `tools/build_timetable.py` against JR West's timetable site and commits the result. Run it by hand from the Actions tab to refresh now, optionally for a given date.
+
+The app runs on Japan time when the timetable is present, and works out each train's position between stops from the scheduled times (it is not live tracking). Without the file it falls back to an invented sample day.
+
+```
+python3 tools/build_timetable.py              # today in Japan
+python3 tools/build_timetable.py --date 20261204 --dump tools/.cache/pages   # a given day, keeping the raw pages
+```
