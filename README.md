@@ -18,11 +18,12 @@ What is placeholder:
 - **Terrain:** procedural noise. To be replaced by GSI DEM elevation tiles.
 - **Timetable:** an invented sample. A scheduling pass holds each Kodama at stations so faster trains overtake it there.
 - **500 series pantograph type and position:** unverified.
-- **Other trains:** simple far-view box shapes.
+- **N700 family (all other trains):** approximate proportions, with no drawing yet. Nozomi (N700A) is white with a blue stripe; Sakura and Kodama (7000/8000 series) are navy with a gold stripe. Trains within 3.5 km of the camera are drawn at full detail with instanced geometry; farther ones are simple boxes.
 
 Controls:
 - **Chase / Overview:** one continuous orbit camera. Zoom out from the train and it carries on into the overview. Close in, it turns with the train; far out, it's fixed to the map and its centre drifts from the train to the whole line. The buttons fly between the two.
 - **Cinematic:** an automatic director that cuts between shots: a short flyby, tracking alongside, aerial orbit, aerial catching up and aerial left behind, nose, overhead, and tunnel entrance. It cuts to the platform as the 500 series arrives at each stop, and holds there while it stands.
+- **Train selector:** follow any running train. The cameras, the cinematic director and the info panel all switch to it.
 - **Platform:** stand on any station's platform, in either direction. Drag to look around and pinch to zoom. A departure board lists the next trains and whether each stops or passes through.
 - **View menu:** persistence and glow sliders, plus layer toggles (terrain, coastline, rivers, motorways, trunk roads, JR lines, other railways).
 - Time speed 1×–300×. Drag to orbit, pinch or scroll to zoom.
