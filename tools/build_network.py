@@ -139,14 +139,28 @@ def build(L):
     for a, b in gaps[:8]: log(f'    gap {a * STEP / 1000:.1f}-{b * STEP / 1000:.1f} km')
     line = [(bins[k][0] / bins[k][2], bins[k][1] / bins[k][2]) for k in keys]
     line = resample(smooth(line, 3), 25)
+    try:                                   # fast path: a KD-tree over the rail points (numpy + scipy)
+        import numpy as np
+        from scipy.spatial import cKDTree
+        R = np.array([(q[0], q[1]) for cell in grid.values() for q in cell]); tree = cKDTree(R)
+        def shift(line, radius, sigma):
+            P = np.array(line); out = P.copy()
+            for i, nb in enumerate(tree.query_ball_point(P, radius)):
+                if not nb: continue
+                Q = R[nb]; wt = np.exp(-((Q - P[i]) ** 2).sum(1) / (sigma * sigma)); sw = wt.sum()
+                if sw > 1e-9: out[i] = (Q * wt[:, None]).sum(0) / sw
+            return [tuple(p) for p in out]
+    except ImportError:
+        def shift(line, radius, sigma):
+            moved = []
+            for p in line:
+                sx = sz = sw = 0.0
+                for q in near(p, radius):
+                    wt = math.exp(-((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2) / (sigma * sigma)); sx += q[0] * wt; sz += q[1] * wt; sw += wt
+                moved.append((sx / sw, sz / sw) if sw > 1e-9 else p)
+            return moved
     for radius, sigma, w in [(120, 50, 3), (60, 20, 3), (20, 8, 2), (8, 4, 2), (8, 4, 2)]:
-        moved = []
-        for p in line:
-            sx = sz = sw = 0.0
-            for q in near(p, radius):
-                wt = math.exp(-((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2) / (sigma * sigma)); sx += q[0] * wt; sz += q[1] * wt; sw += wt
-            moved.append((sx / sw, sz / sw) if sw > 1e-9 else p)
-        line = resample(smooth(moved, w), 25)
+        line = resample(smooth(shift(line, radius, sigma), w), 25)
     line = resample(line, STEP)
     ds = sorted(dist_to_rail(p, 200) for p in line[::4])
     log(f'  {L["id"]}: {len(line) * STEP / 1000:.1f} km, rail offset median {statistics.median(ds):.1f} m, p99 {ds[int(.99 * len(ds))]:.0f} m')

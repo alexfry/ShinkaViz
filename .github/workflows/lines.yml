@@ -28,6 +28,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Python libraries (for the fast track fitting)
+        run: pip install --quiet numpy scipy
       - name: Build lines from OpenStreetMap
         run: python3 tools/build_network.py ${{ github.event.inputs.lines }}
       - name: Commit if changed
