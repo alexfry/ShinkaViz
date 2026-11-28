@@ -948,11 +948,12 @@ function orbitCam(now){const dt=Math.min(.1,Math.max(0,(now-lastOrbNow)/1000));l
   ORB.yaw=lerpA(A.yaw,B.yaw,e);if(t>=1)anim=null;}
  /* pulled out to the overview, north is always up: the camera sits due south of its target (z is south) */
  ORB.yaw=lerpA(ORB.yaw,Math.PI/2,ss(12000,30000,ORB.dist));
- const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw,cp=Math.cos(ORB.pitch);
+ /* pulling out past the overview, the view tilts gradually to looking straight down */
+ const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw,pe=lerp(ORB.pitch,1.54,ss(7.6,12.2,Math.log(d))),cp=Math.cos(pe);
  T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));T.x+=PAN.x;T.z+=PAN.z;
  if(glideFrom){const gx=glideFrom.x-T.x,gy=glideFrom.y-T.y,gz=glideFrom.z-T.z;if(Math.hypot(gx,gz)<80000){OFF.x=gx;OFF.y=gy;OFF.z=gz;}else OFF.x=OFF.y=OFF.z=0;glideFrom=null;}
  {const f=Math.exp(-dt/.45);OFF.x*=f;OFF.y*=f;OFF.z*=f;T.x+=OFF.x;T.y+=OFF.y;T.z+=OFF.z;}
- cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(ORB.pitch)*d,T.z+Math.sin(a)*cp*d);
+ cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(pe)*d,T.z+Math.sin(a)*cp*d);
  cam.fov=50;cam.near=Math.max(.3,d*.05);cam.far=d*5+130000;ovf=ss(20000,300000,d);
  U.uFadeNear.value=Math.max(25000,d*3);U.uFadeFar.value=Math.max(115000,d*6);}
 
