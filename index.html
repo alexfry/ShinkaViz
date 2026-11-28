@@ -596,7 +596,7 @@ const M700N=buildModel(specN700('noz')),M700K=buildModel(specN700('kyu'));
    end car (26.25 m: 15 m nose, 5.25 m tip to bogie, 17.5 m bogie centres, 3.35 x 3.65 m section; measured at 13.69 mm/px).
    Top line from the side view with the cab canopy split out; half-widths from the plan, including the duckbill and its flare. */
 const E5SWEEP=[[1.9,.5],[2.35,.66],[2.92,1.15],[3.5,1.44],[4.2,1.64],[5.36,1.81],[7,2.05],[9,2.37],[11,2.72]];
-const SPECE5={LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut:[1.95,.22],bump:10,
+function specE5(liv){return {LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut:[1.95,.22],bump:10,
  NU:d=>d<3?2.2+d/3:3.2,nl:d=>d<3?2.5+2.5*d/3:5,
  fair:[[[-1.95,.2],[-1.95,.86],[1.95,.86],[1.95,.2]]],
  TAB_W:[[0,.2],[.04,.24],[.08,.38],[.12,.46],[.16,.54],[.25,.66],[.33,.76],[.41,.85],[.49,.92],[.57,.97],[.66,1.01],[.74,1.05],[.82,1.08],[1.16,1.16],[1.51,1.22],[1.85,1.24],[2.19,1.26],[2.53,1.27],[2.87,1.39],[3.22,1.53],[3.56,1.61],[3.9,1.65],[4.6,1.675],[15,1.675]],
@@ -606,7 +606,7 @@ const SPECE5={LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut:[1.95,.22],bum
  decorate({S,P,len,nf,nr,xAt,dOf,zOn,lon,along,rect,pt,pf}){
   /* livery: Tokiwa green above, white below, the pink Hayate stripe between (above the windows; on the nose it sweeps down
      towards the chin). Lines are tinted to match. */
-  const GR=[.15,1.15,.55],PK=[1.7,.45,1.0],WH=mul(HB,1.15);
+  const GR=[.15,1.15,.55],PK=liv==='h5'?[1.05,.55,1.8]:[1.7,.45,1.0],WH=mul(HB,1.15);   /* H5: Saisai purple instead of Hayate pink */
   along(.95,mul(GR,1.4));along(Math.PI-.95,mul(GR,1.4));            /* roof shoulders */
   lon(2.79,mul(GR,1.6),11);lon(2.74,PK,11);
   lon(.62,mul(HB,.45),3.5);                                           /* lower body */
@@ -627,8 +627,8 @@ const SPECE5={LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut:[1.95,.22],bum
   {let p=null;for(let k=0;k<=16;k++){const q=pt(5.05*k/16,0,.03);if(p)S.add(p,q,mul(GR,1.5));p=q;}}
   /* front view: the nose tip and the headlight clusters either side of it */
   {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.99*Math.cos(t),1.13+.55*Math.sin(t),.03));}poly(o,WH,true);}
-  for(const sd of[-1,1]){const o=[];for(let k=0;k<32;k++){const t=k/32*Math.PI*2;o.push(pf(sd*.58+.24*Math.cos(t),.92+.1*Math.sin(t),.04));}poly(o,mul(HC,2.2),true);}}};
-const ME5=buildModel(SPECE5);
+  for(const sd of[-1,1]){const o=[];for(let k=0;k<32;k++){const t=k/32*Math.PI*2;o.push(pf(sd*.58+.24*Math.cos(t),.92+.1*Math.sin(t),.04));}poly(o,mul(HC,2.2),true);}}};}
+const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5'));
 
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const HCUT={value:0};/* on board, the camera is inside a car: drop silhouette shells within this distance */
@@ -668,7 +668,7 @@ const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix
  fragmentShader:`uniform vec3 uCol;uniform float uScale,uCut;varying float vK,vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*vK,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
 /* model families: shared shape (occluders, outline hulls) and per-livery line templates; lamp = headlight [x from car centre, height, z] */
 const FAMS={n7:{M:M700N,end:27,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
- e5:{M:ME5,end:26.25,livs:{e5:ME5},lamp:[26.25/2-.45,.92,.58],ax:5.25,cab:[7.6,2.95,-.3]}};
+ e5:{M:ME5,end:26.25,livs:{e5:ME5,h5:MH5},lamp:[26.25/2-.45,.92,.58],ax:5.25,cab:[7.6,2.95,-.3]}};
 const LIVFAM={};for(const f in FAMS)for(const l in FAMS[f].livs)LIVFAM[l]=f;
 const NMAX=160,NT={lines:{},occ:{},hull:{}},DYN=THREE.DynamicDrawUsage;
 for(const fam in FAMS){const F=FAMS[fam],CARGS={front:[F.end,true,false],mid:[25,false,false],rear:[F.end,false,true]};NT.occ[fam]={};NT.hull[fam]={};for(const l in F.livs)NT.lines[l]={};
@@ -726,15 +726,17 @@ const VMAX=300/3.6,RA=1/(2*ACC)+1/(2*DEC);
 /* cruise speed that covers d metres in the scheduled T seconds (accelerate, cruise, brake); capped at line speed */
 function fitRun(d,T,vm=VMAX){const D=T*T-4*RA*d;if(!(T>0)||D<=0)return segRun(d,vm);const v=Math.min(vm,(T-Math.sqrt(D))/(2*RA));return v>=vm-1e-6?segRun(d,vm):{v,T:d/v+RA*v};}
 const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama','名古屋':'Nagoya','京都':'Kyoto','熊本':'Kumamoto','鹿児島中央':'Kagoshima-Chuo','新鳥栖':'Shin-Tosu','久留米':'Kurume','筑後船小屋':'Chikugo-Funagoya','新大牟田':'Shin-Omuta','新玉名':'Shin-Tamana','新八代':'Shin-Yatsushiro','博多南':'Hakata-Minami'};
-/* JR East's pages don't name the rolling stock; these are what each service runs today */
+/* JR East's pages don't name the rolling stock; these are what each service runs today. JR Hokkaido's four H5 sets run a fixed
+   set of Hayabusa (March 2026 timetable, from shinkansenkenkyu.com's formation pages); the Hayate shuttles can be either. */
+const H5_HAYABUSA=new Set([95,1,7,13,19,23,25,27,31,39,43,10,14,18,22,28,32,34,40,44,48,96]);
 const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6',tsubasa:'E8',toki:'E7',tanigawa:'E7',kagayaki:'E7',hakutaka:'E7',tsurugi:'E7',asama:'E7'};
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];
-  const stk=t.stock||DEF_STOCK[type]||null,fam=stk==='E5'||stk==='H5'?'e5':'n7',endL=FAMS[fam].end;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:25);
+  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':'n7',endL=FAMS[fam].end;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:25);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
-  const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock||DEF_STOCK[type]||null,dest:t.dest,
-   fam,liv:fam==='e5'?'e5':cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
+  const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:stk,dest:t.dest,
+   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
