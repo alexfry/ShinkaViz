@@ -694,35 +694,71 @@ function specE8(){const B=specE5('e5'),kd=9/15,kw=2.945/3.35,sd=T=>T.map(([d,v])
 /* E7/W7 (Hokuriku: Kagayaki, Hakutaka, Tsurugi, Asama; Joetsu: Toki, Tanigawa). Fitted to a side elevation of the end car
    (26.05 m, 9.1 m nose, 3.38 m wide; measured at 22.15 mm/px): ivory body, sky-blue roof and nose top, copper bands. The
    headlights are the slits low on the nose sides. Plan widths (no top view available) follow the front view's broad nose. */
-const SPECE7={LN:9.1,MR:44,skirt:.2,waist:.38,bog:[4.77,22.27],cut:[1.95,.22],
+const SPECE7={LN:9.2,MR:44,skirt:.2,waist:.38,bog:[4.77,22.27],cut:[1.95,.22],
  NU:d=>d<2?2.2+.8*d/2:3,nl:d=>d<2?2.5+2*d/2:4.5,
  fair:[[[-1.95,.2],[-1.95,.86],[1.95,.86],[1.95,.2]]],
- TAB_W:[[0,.35],[.1,.6],[.3,1.0],[.7,1.3],[1.3,1.48],[2.2,1.6],[3.5,1.66],[5,1.69],[9.1,1.69]],
- TAB_T:[[0,.88],[.08,1.1],[.22,1.32],[.4,1.6],[.59,1.84],[.9,2.08],[1.26,2.28],[2,2.61],[2.8,2.83],[3.84,3.05],[4.95,3.32],[6.07,3.49],[7.16,3.57],[8,3.62],[9.1,3.65]],
- TAB_C:[[0,0],[9.1,0]],
- TAB_B:[[0,.73],[.1,.55],[.22,.44],[.45,.34],[.74,.29],[1.2,.24],[2,.2],[9.1,.2]],
+ TAB_W:[[0,.35],[.1,.6],[.3,1.0],[.7,1.3],[1.3,1.48],[2.2,1.6],[3.5,1.66],[5,1.69],[9.2,1.69]],
+ /* top line and underside traced pixel by pixel from the elevation */
+ TAB_T:[[0,.85],[.13,1.09],[.31,1.24],[.49,1.4],[.67,1.51],[1.02,1.69],[1.38,1.84],[1.73,1.98],[2.09,2.11],[2.44,2.24],[2.8,2.4],[3.15,2.6],[3.51,2.75],[3.86,2.91],[4.22,3.06],[4.57,3.2],[4.93,3.31],[5.28,3.42],[5.64,3.48],[6.17,3.53],[6.7,3.51],[7.23,3.5],[7.77,3.53],[8.3,3.6],[8.83,3.64],[9.2,3.66]],
+ TAB_C:[[0,0],[9.2,0]],
+ TAB_B:[[0,.75],[.13,.53],[.3,.36],[.7,.3],[1.5,.22],[3,.2],[9.2,.2]],
  decorate({S,P,len,nf,nr,xAt,zOn,lon,along,rect,pt,pf}){
   const CU=[1.6,.8,.45],BL=[.45,.8,1.9];
   const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
   const side=(T,col)=>{for(const s of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
   const end=nf||nr;
   along(.95,mul(BL,.9));along(Math.PI-.95,mul(BL,.9));
-  lon(3.46,CU,end?9:0);lon(1.88,CU,end?9.75:0);lon(1.74,BL,end?10.5:0);lon(.62,mul(HB,.45),2.5);
-  if(end){for(const [d,w] of[[7.8,.3],[9.15,.36],[22.06,.36]]){const x=xAt(d);rect(x-w,x+w,1.25,3.06,mul(HB,1.2));}
+  lon(3.36,CU,end?8:0);lon(3.5,BL,end?8.3:0);lon(1.94,CU,end?10.07:0);lon(1.8,BL,end?10.07:0);lon(.62,mul(HB,.45),2.5);
+  if(end){for(const [d,w] of[[7.65,.3],[9.15,.36],[22.06,.36]]){const x=xAt(d);rect(x-w,x+w,1.25,3.06,mul(HB,1.2));}
    for(let k=0;k<10;k++){const x=xAt(11.34+1.04*k);rect(x-.29,x+.29,2.02,2.54,mul(HB,.9));}}
   else{const x0=-len/2+1.0,x1=len/2-1.0;rect(x0-.36,x0+.36,1.25,3.06,mul(HB,1.2));rect(x1-.36,x1+.36,1.25,3.06,mul(HB,1.2));
    for(let x=-len/2+3.0;x<=len/2-3.0+1e-6;x+=1.04)rect(x-.29,x+.29,2.02,2.54,mul(HB,.9));}
   if(!end)return;
   /* nose: the copper bands (upper, under the blue nose top; lower, rising to the body stripe) and the headlight slit */
-  side([[.25,1.15],[.7,1.55],[1.26,1.86],[2.2,2.22],[3.47,2.64],[4.6,2.92],[5.7,3.11],[6.8,3.3],[7.9,3.42],[9,3.46]],CU);
-  side([[.44,.92],[2,1.08],[4.2,1.15],[6.4,1.23],[7.5,1.35],[8.27,1.64],[9,1.79],[9.75,1.88]],CU);
-  side([[1.2,1.42],[2.8,1.66],[2.78,1.77],[1.55,1.6],[1.2,1.42]],mul(HC,2.3));
+  /* traced from the copper and blue pixels of the elevation */
+  side([[.84,1.26],[1.2,1.51],[1.55,1.7],[1.91,1.85],[2.26,2.01],[2.62,2.13],[2.97,2.25],[3.33,2.36],[3.68,2.46],[4.04,2.57],[4.39,2.67],[4.75,2.78],[5.1,2.87],[5.46,2.97],[5.81,3.06],[6.17,3.14],[6.52,3.21],[6.88,3.26],[7.23,3.3],[7.59,3.34],[8,3.36]],CU);
+  side([[.49,1.23],[.84,1.49],[1.2,1.69],[1.55,1.84],[1.91,1.99],[2.26,2.13],[2.62,2.26],[2.97,2.39],[3.33,2.49],[3.68,2.59],[4.04,2.68],[4.39,2.8],[4.75,2.9],[5.1,3.0],[5.46,3.08],[5.81,3.17],[6.17,3.26],[6.52,3.35],[6.88,3.42],[7.23,3.46],[7.59,3.49],[8.3,3.5]],BL);
+  side([[.49,.91],[.84,.93],[1.2,.98],[1.55,1.01],[1.91,1.04],[2.26,1.07],[2.62,1.1],[2.97,1.12],[3.68,1.14],[4.39,1.18],[5.1,1.19],[6.17,1.2],[6.52,1.2],[6.88,1.23],[7.23,1.28],[7.59,1.35],[7.94,1.44],[8.3,1.55],[8.65,1.64],[9.01,1.75],[9.36,1.83],[9.72,1.9],[10.07,1.94]],CU);
+  side([[1.45,1.46],[2.7,1.84],[2.7,1.92],[1.5,1.56],[1.45,1.46]],mul(HC,2.3));
   /* windscreen on the nose top (3.0-7.0 m) */
   {const G=[[3.0,0],[3.1,.45],[3.5,.8],[4.3,.92],[6.3,.9],[7.0,.7],[7.0,0]],o=[];for(const [d,z] of G)o.push(pt(d,z,.06));for(const [d,z] of G.slice().reverse())o.push(pt(d,-z,.06));poly(o,mul(HC,2.5),true);}
   /* front view: the copper V framing the blue centre panel, and the lower band wrapping round the nose */
   for(const sd of[-1,1]){poly(dens([[1.17,3.5],[1.0,2.6],[.81,1.46],[.66,.95]]).map(([z,h])=>pf(sd*z,h,.03)),CU);
    poly(dens([[.68,1.0],[1.2,1.15],[1.6,1.27]]).map(([z,h])=>pf(sd*z,h,.03)),CU);}}};
 const ME7=buildModel(SPECE7);
+/* 700 series Rail Star (JR West 7000 series, 8-car Sanyo Kodama). Side profile and livery fitted to an elevation of the end car
+   (27.1 m; measured at 22.29 mm/px); nose plan and the 6.1 m tip-to-bogie from a dimensioned diagram. The flat "duck bill"
+   nose, a blue-grey cab cowl over the top, navy window band over a yellow stripe, grey below 0.88 m. Headlights sit in the
+   front of the cowl, just ahead of the windscreen. */
+const SPEC700={LN:9.0,MR:44,skirt:.2,waist:.36,bog:[6.1,23.6],cut:[1.85,.24],
+ NU:d=>d<2.5?2.0+1.0*d/2.5:3,nl:d=>d<2.5?2.4+2*d/2.5:4.4,
+ fair:[[[-1.85,.2],[-1.85,.88],[1.85,.88],[1.85,.2]]],
+ TAB_W:[[0,.12],[.13,.45],[.4,.9],[.8,1.25],[1.38,1.46],[2.2,1.58],[3.27,1.64],[5,1.68],[6,1.69],[9,1.69]],
+ /* top line and underside traced pixel by pixel from the elevation */
+ TAB_T:[[0,.7],[.07,.85],[.33,1.03],[.6,1.16],[.87,1.29],[1.14,1.4],[1.4,1.49],[1.67,1.6],[1.94,1.72],[2.21,1.81],[2.47,1.89],[2.74,2.01],[3.01,2.12],[3.28,2.23],[3.54,2.34],[3.81,2.47],[4.08,2.63],[4.35,2.76],[4.61,2.85],[4.88,2.96],[5.15,3.08],[5.42,3.16],[5.68,3.25],[5.95,3.34],[6.22,3.41],[6.49,3.45],[6.75,3.52],[7.02,3.57],[7.29,3.59],[7.56,3.61],[8.09,3.63],[9,3.63]],
+ TAB_C:[[0,0],[9,0]],
+ TAB_B:[[0,.6],[.07,.51],[.33,.38],[.6,.31],[.87,.27],[1.14,.22],[1.67,.2],[9,.2]],
+ decorate({S,P,len,nf,nr,xAt,zOn,lon,along,rect,pt,pf}){
+  const NV=[.2,.35,1.3],YE=[1.9,1.6,.2],CW=[.6,.8,1.35];
+  const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
+  const side=(T,col)=>{for(const s of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
+  const end=nf||nr,bd=end?9.38:0;
+  lon(2.66,NV,bd);lon(1.98,NV,bd);lon(1.76,YE,bd);lon(.85,mul(HB,.6),3);
+  if(end){for(const [d,w] of[[7.68,.28],[8.58,.37],[23.83,.36]]){const x=xAt(d);rect(x-w,x+w,1.28,3.09,mul(HB,1.2));}
+   for(let k=0;k<13;k++){const x=xAt(10.13+1.03*k);rect(x-.34,x+.34,2.04,2.6,mul(HB,.9));}}
+  else{const x0=-len/2+.9,x1=len/2-.9;rect(x0-.36,x0+.36,1.28,3.09,mul(HB,1.2));rect(x1-.36,x1+.36,1.28,3.09,mul(HB,1.2));
+   for(let x=-len/2+2.4;x<=len/2-2.4+1e-6;x+=1.03)rect(x-.34,x+.34,2.04,2.6,mul(HB,.9));}
+  if(!end)return;
+  /* the cab cowl's edge on the nose sides, and the grey bill below */
+  side([[2.1,1.76],[2.36,1.85],[2.67,1.94],[2.99,2.05],[3.3,2.14],[3.61,2.23],[3.92,2.32],[4.23,2.41],[4.55,2.5],[4.86,2.59],[5.17,2.67],[5.48,2.76],[5.79,2.87],[6.11,2.99],[6.42,3.1],[6.73,3.19],[7.04,3.3],[7.35,3.41],[7.67,3.52],[7.9,3.6]],CW);
+  side([[.18,.69],[.49,.71],[.8,.76],[1.11,.78],[1.43,.8],[1.74,.82],[2.05,.85],[3,.87],[3.9,.89]],mul(HB,.8));
+  /* windscreen on the cowl (4.5-5.9 m) */
+  {const G=[[4.45,0],[4.55,.45],[4.9,.72],[5.5,.8],[5.9,.72],[5.95,0]],o=[];for(const [d,z] of G)o.push(pt(d,z,.06));for(const [d,z] of G.slice().reverse())o.push(pt(d,-z,.06));poly(o,mul(HC,2.5),true);}
+  /* the cowl seen from the front: an oval over the nose top, down to about 1.6 m */
+  {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(1.12*Math.cos(t),2.6+1.0*Math.sin(t),.03));}poly(o,CW,true);}
+  {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.95*Math.cos(t),.95+.35*Math.sin(t),.03));}poly(o,mul(HB,.8),true);}
+  for(const sd of[-1,1]){const o=[];for(let k=0;k<24;k++){const t=k/24*Math.PI*2;o.push(pt(3.0+.22*Math.cos(t),sd*(.37+.15*Math.sin(t)),.05));}poly(o,mul(HC,2.3),true);}}};
+const M700=buildModel(SPEC700);
 const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5')),ME6=buildModel(specE6()),ME8=buildModel(specE8());
 
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
@@ -765,7 +801,8 @@ const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix
 const FAMS={n7:{M:M700N,end:27,mid:25,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
  e5:{M:ME5,end:26.25,mid:25,livs:{e5:ME5,h5:MH5},lamp:[26.25/2-6.4,2.2,1.27],ax:5.25,cab:[7.6,2.95,-.3]},
  e6:{M:ME6,end:23.075,mid:20.5,livs:{e6:ME6},lamp:[23.075/2-5.6,2.2,1.12],ax:5.75,cab:[6.6,2.85,-.28]},
- e7:{M:ME7,end:26.05,mid:25,livs:{e7:ME7},lamp:[26.05/2-2.0,1.55,1.4],ax:4.77,cab:[5.3,2.85,-.35]},
+ e7:{M:ME7,end:26.05,mid:25,livs:{e7:ME7},lamp:[26.05/2-2.1,1.68,1.35],ax:4.77,cab:[5.3,2.85,-.35]},
+ r7:{M:M700,end:27.1,mid:25,livs:{r7:M700},lamp:[27.1/2-3.0,2.2,.37],ax:6.1,cab:[5.0,2.75,-.35]},
  e8:{M:ME8,end:23.075,mid:20.5,livs:{e8:ME8},lamp:[23.075/2-4.6,2.0,1.02],ax:5.7,cab:[5.4,2.7,-.28]}};
 const LIVFAM={};for(const f in FAMS)for(const l in FAMS[f].livs)LIVFAM[l]=f;
 const NMAX=160,NT={lines:{},occ:{},hull:{}},DYN=THREE.DynamicDrawUsage;
@@ -831,10 +868,10 @@ const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];
-  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':stk==='E6'?'e6':stk==='E8'?'e8':stk==='E7'||stk==='W7'?'e7':'n7',endL=FAMS[fam].end,midL=FAMS[fam].mid;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:midL);
+  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':stk==='E6'?'e6':stk==='E8'?'e8':stk==='E7'||stk==='W7'?'e7':stk==='700'?'r7':'n7',endL=FAMS[fam].end,midL=FAMS[fam].mid;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:midL);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:stk,dest:t.dest,
-   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):fam==='e6'||fam==='e8'||fam==='e7'?fam:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
+   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):fam==='e6'||fam==='e8'||fam==='e7'||fam==='r7'?fam:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
