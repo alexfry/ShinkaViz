@@ -912,6 +912,17 @@ function pass(m,rt){quad.material=m;renderer.setRenderTarget(rt);renderer.render
 /* ---------- camera: one continuous orbit (chase <-> overview) and a cinematic director ---------- */
 let mode='cine',speed=1,anim=null,ovf=0;
 const ORB={yaw:.55,pitch:.12,dist:40,min:12,max:2500000};
+/* overview panning: an east/south offset of the camera's target, which fades in as the camera pulls out to the overview */
+const PAN={x:0,z:0},OVW=d=>ss(12000,30000,d);
+const baseT=d=>{const P=FP0,k=ss(60000,260000,d);return [lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cz+P.uz*1.6,CZ,k)];};
+/* zoom by factor f keeping the ground point under the cursor fixed on screen (overview only; closer in it zooms on the train) */
+const RC=new THREE.Raycaster(),NDC=new THREE.Vector2(),GP=new THREE.Plane(new THREE.Vector3(0,1,0),0),HIT=new THREE.Vector3();
+function groundAt(cx,cy){const r=canvas.getBoundingClientRect();NDC.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);RC.setFromCamera(NDC,cam);GP.constant=-T.y;return RC.ray.intersectPlane(GP,HIT)?[HIT.x,HIT.z]:null;}
+function zoomAt(cx,cy,f){const d0=ORB.dist,d1=Math.min(ORB.max,Math.max(ORB.min,d0*f));f=d1/d0;
+ const w=OVW(d0);if(w>0){const r=canvas.getBoundingClientRect();NDC.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);RC.setFromCamera(NDC,cam);GP.constant=-T.y;
+  if(RC.ray.intersectPlane(GP,HIT)){const b0=baseT(d0),b1=baseT(d1),w1=OVW(d1)||1;
+   const tx=(T.x-HIT.x)*(f-1)+T.x,tz=(T.z-HIT.z)*(f-1)+T.z;PAN.x=(tx-b1[0])/w1;PAN.z=(tz-b1[1])/w1;}}
+ ORB.dist=d1;ORB.pitch=clampPitch(ORB.pitch);}
 const T=new THREE.Vector3(),hs0={s:0,v:0,stop:-1,i:0};
 if(!hero)hero=pickFocus(jstNow());
 let FT=hero,fs=hs0,FP0=HP0,lastHd=null;const FSX={s:0,v:0,stop:-1,i:0};
@@ -930,7 +941,7 @@ function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===nu
  /* pulled out to the overview, north is always up: the camera sits due south of its target (z is south) */
  ORB.yaw=lerpA(ORB.yaw,Math.PI/2,ss(12000,30000,ORB.dist));
  const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw,cp=Math.cos(ORB.pitch);
- T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));
+ T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));{const w=OVW(d);T.x+=PAN.x*w;T.z+=PAN.z*w;}
  cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(ORB.pitch)*d,T.z+Math.sin(a)*cp*d);
  cam.fov=50;cam.near=Math.max(.3,d*.05);cam.far=d*5+130000;ovf=ss(20000,300000,d);
  U.uFadeNear.value=Math.max(25000,d*3);U.uFadeFar.value=Math.max(115000,d*6);}
@@ -1016,14 +1027,18 @@ let tapD=null;canvas.addEventListener('pointerup',e=>{if(tapD&&ptrs.size<=1&&Mat
 canvas.addEventListener('pointerdown',e=>{tapD=ptrs.size?null:[e.clientX,e.clientY,performance.now()];try{canvas.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch=Math.hypot(a[0]-b[0],a[1]-b[1]);}});
 canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;if(mode==='board'){if(ptrs.size===1){OB.yaw=Math.min(1.4,Math.max(-1.4,OB.yaw+dx*.004));OB.pitch=Math.min(.6,Math.max(-.5,OB.pitch-dy*.003));}else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)OB.fov=Math.min(80,Math.max(20,OB.fov*pinch/d));pinch=d;}return;}if(mode==='plat'){if(ptrs.size===1){PLAT_CAM.yaw-=dx*.004;PLAT_CAM.pitch=Math.min(.6,Math.max(-.6,PLAT_CAM.pitch+dy*.003));}else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*pinch/d));pinch=d;}return;}
  if(mode!=='orbit')return;anim=null;
- if(ptrs.size===1){ORB.yaw+=dx*.006;ORB.pitch=clampPitch(ORB.pitch+dy*.005);}
- else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0){ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*pinch/d));ORB.pitch=clampPitch(ORB.pitch);}pinch=d;}});
+ const ow=OVW(ORB.dist);
+ if(ptrs.size===1){if(ow>.5&&!e.shiftKey&&!(e.buttons&2)){/* overview: drag the map (right-drag or shift-drag tilts) */
+   const g0=groundAt(e.clientX-dx,e.clientY-dy),g1=groundAt(e.clientX,e.clientY);if(g0&&g1){PAN.x-=(g1[0]-g0[0])/ow;PAN.z-=(g1[1]-g0[1])/ow;}}
+  else{ORB.yaw+=dx*.006;ORB.pitch=clampPitch(ORB.pitch+dy*.005);}}
+ else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)zoomAt((a[0]+b[0])/2,(a[1]+b[1])/2,pinch/d);pinch=d;}});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
 const up=e=>{ptrs.delete(e.pointerId);pinch=0;};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='board'){OB.fov=Math.min(80,Math.max(20,OB.fov*Math.exp(e.deltaY*.0012)));return;}if(mode==='plat'){PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*Math.exp(e.deltaY*.0012)));return;}if(mode!=='orbit')return;anim=null;ORB.dist=Math.min(ORB.max,Math.max(ORB.min,ORB.dist*Math.exp(e.deltaY*.0012)));ORB.pitch=clampPitch(ORB.pitch);},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='board'){OB.fov=Math.min(80,Math.max(20,OB.fov*Math.exp(e.deltaY*.0012)));return;}if(mode==='plat'){PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*Math.exp(e.deltaY*.0012)));return;}if(mode!=='orbit')return;anim=null;zoomAt(e.clientX,e.clientY,Math.exp(e.deltaY*.0012));},{passive:false});
 function setMode(m){if(m==='board'){mode='board';anim=null;$('#shot').textContent='';setOB(OB.view);}
  else if(m==='plat'){if(mode!=='plat'){const ne=FT.ev[Math.min(fs.i+1,FT.ev.length-1)];setPlat(fs.stop>=0?fs.stop:ne.k,1);}mode='plat';anim=null;$('#shot').textContent='';}
  else if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
- else{const b=PRESET[m]();if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
+ else{const b=PRESET[m]();PAN.x=PAN.z=0;if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m);});
 for(const g of document.querySelectorAll('.grp')){const ic=g.querySelector('.ico');ic.addEventListener('click',e=>{e.stopPropagation();const o=!g.classList.contains('open');for(const x of document.querySelectorAll('.grp'))x.classList.remove('open');g.classList.toggle('open',o);ic.setAttribute('aria-expanded',String(o));});
  g.querySelector('.seg').addEventListener('click',e=>{if(e.target.closest('button')){g.classList.remove('open');ic.setAttribute('aria-expanded','false');}});}
@@ -1067,7 +1082,7 @@ function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode===
 $('#timeGrp .cur').textContent='1×';$('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;$('#timeGrp .cur').textContent=b.textContent;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
 const glow=$('#glow');
 
-function setFocus(tr){if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
+function setFocus(tr){PAN.x=PAN.z=0;if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
  {fs={s:0,v:0,stop:-1,i:0};FP0={...HP0};const st=stateAt(tr,simT,FSX);if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(tr,st.s+tr.dir*(tr.len/2-tr.cl[0]/2),FP0);}}
  clearP=true;cine.shot=null;anim=null;$('#trainSel').value=String(trains.indexOf(tr));selKey='';}
 /* train selector: every running train, down trains first, in departure order */
