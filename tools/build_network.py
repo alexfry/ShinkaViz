@@ -52,7 +52,7 @@ def smooth(pts, w):
 
 def queries(L):
     s, w, n, e = L['bbox']; bb = f'{s},{w},{n},{e}'
-    rx = '^(' + '|'.join(L['osm']) + ')'
+    rx = '(' + '|'.join(L['osm']) + ')'          # anywhere in the name (津軽海峡線, 奥羽本線 (山形線)...)
     tracks = f'''[out:json][timeout:240];
 (
   relation["route"~"^(railway|train)$"]["name"~"{rx}"]({bb});
