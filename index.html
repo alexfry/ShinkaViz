@@ -927,6 +927,8 @@ function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===nu
  if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=easeIO(t),A=anim.a,B=anim.b;
   ORB.dist=Math.exp(lerp(Math.log(A.dist),Math.log(B.dist),e));ORB.pitch=lerp(A.pitch,B.pitch,e);
   ORB.yaw=lerpA(A.yaw,B.yaw,e);if(t>=1)anim=null;}
+ /* pulled out to the overview, north is always up: the camera sits due south of its target (z is south) */
+ ORB.yaw=lerpA(ORB.yaw,Math.PI/2,ss(12000,30000,ORB.dist));
  const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw,cp=Math.cos(ORB.pitch);
  T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));
  cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(ORB.pitch)*d,T.z+Math.sin(a)*cp*d);
