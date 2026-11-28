@@ -7,7 +7,7 @@ on:
     - cron: '17 19 * * *'      # 04:17 JST, just after the timetable site's day rolls over at 04:00
   push:                       # also whenever the scraper or this workflow changes
     branches: [main]
-    paths: ['tools/build_timetable.py', '.github/workflows/timetable.yml']
+    paths: ['tools/build_timetable.py', 'tools/explore_jreast.py', 'tools/build_jreast.py', '.github/workflows/timetable.yml']
   workflow_dispatch:
     inputs:
       date:
