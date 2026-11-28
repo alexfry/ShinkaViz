@@ -575,7 +575,7 @@ function specN700(liv){return {LN:10.7,KH:57,sub:4,NU:4,skirt:.21,waist:.41,bog:
   const cr=(T,col,from=-1,to=99)=>{for(const sd of[-1,1]){const o=[],d0=Math.max(from,T[0][0],0),d1=Math.min(to,T[T.length-1][0]);for(let d=d0;d<=d1+1e-6;d+=.06)o.push(onS(d,sd*tab(col3(T,1),d)));poly(o,col);}};
   cr(N7A1,mul(HB,1.7));cr(N7A2,mul(HB,1.3),0,4.6);cr(N7B,mul(HB,1.5),2.2);cr(N7C,mul(HB,1.2));cr(N7LCR,mul(HB,1.1));
   /* side-view lines on the outer surface */
-  const side=(T,col,closed)=>{for(const sd of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01)];}),col,closed);};
+  const side=(T,col,closed)=>{for(const sd of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01)];}),col,closed);};
   const c3=(T,col,from=-1)=>{for(const sd of[-1,1]){const o=[];for(let d=Math.max(from,T[0][0]);d<=T[T.length-1][0]+1e-6;d+=.08){const [zz,hh]=N7at(T,d);o.push([xAt(d),hh+.01,sd*(zz+.012)]);}poly(o,col);}};
   c3(N7LL,mul(HB,1.0),1.5);c3(N7CY,mul(HB,.8));
   /* headlight: side-view slot outline, set along the shoulder crease (plan view puts it at z 0.96-1.17) */
@@ -611,7 +611,7 @@ function specE5(liv){return {LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut
   lon(2.79,mul(GR,1.6),11);lon(2.74,PK,11);
   lon(.62,mul(HB,.45),3.5);                                           /* lower body */
   const end=nf||nr,poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
-  const side=(T,col,dz=0)=>{for(const sd of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01+dz)];}),col);};
+  const side=(T,col,dz=0)=>{for(const sd of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01+dz)];}),col);};
   /* doors and windows (heights 1.3-3.2 m and 2.08-2.63 m on the drawing; 1.04 m window pitch) */
   const doors=end?[[12.7,.29],[13.85,.35],[22.55,.35]].map(([d,w])=>[xAt(d),w]):[[-len/2+1.6,.35],[len/2-1.6,.35]];
   for(const [x,w] of doors)rect(x-w,x+w,1.3,3.2,mul(HB,1.2));
@@ -628,6 +628,8 @@ function specE5(liv){return {LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut
   /* front view: the nose tip and the headlight clusters either side of it */
   {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.99*Math.cos(t),1.13+.55*Math.sin(t),.03));}poly(o,WH,true);}
   lamps(pt,poly,6.4,1.25);}};}
+/* a [d, h] polyline resampled every 0.15 m, so lines drawn on the body follow its curve instead of cutting through it */
+function dens(T){const o=[];for(let i=0;i<T.length-1;i++){const [d0,h0]=T[i],[d1,h1]=T[i+1],n=Math.max(1,Math.ceil(Math.abs(d1-d0)/.15));for(let k=0;k<n;k++)o.push([d0+(d1-d0)*k/n,h0+(h1-h0)*k/n]);}o.push(T[T.length-1]);return o;}
 /* headlights sit in the shoulders either side of the cab canopy, not in the nose (E5, H5, E6 alike) */
 function lamps(pt,poly,d,z){for(const sd of[-1,1]){const o=[];for(let k=0;k<24;k++){const t=k/24*Math.PI*2;o.push(pt(d+.38*Math.cos(t),sd*(z+.12*Math.sin(t)),.05));}poly(o,mul(HC,2.3),true);}}
 /* E6 (Komachi): the E5's mini-shinkansen sibling, 2.945 m wide, 13 m nose, 23.075 m end cars and 20.5 m intermediates
@@ -640,7 +642,7 @@ function specE6(){const B=specE5('e5'),kd=13/15,kw=2.945/3.35,sd=T=>T.map(([d,v]
   decorate({S,P,len,nf,nr,xAt,zOn,lon,along,rect,pt,pf}){
    const RD=[1.9,.28,.5],SV=mul(HB,1.25);
    const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
-   const side=(T,col)=>{for(const s of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
+   const side=(T,col)=>{for(const s of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
    const end=nf||nr;
    along(.95,mul(RD,.9));along(Math.PI-.95,mul(RD,.9));lon(3.2,RD,end?15.5:0);lon(1.8,mul(HB,.7),end?9.5:0);lon(.62,mul(HB,.45),3);
    if(end){for(const [d,w] of[[11.5,.3],[21.1,.36]]){const x=xAt(d);rect(x-w,x+w,1.25,3.15,mul(HB,1.2));}
@@ -659,7 +661,37 @@ function specE6(){const B=specE5('e5'),kd=13/15,kw=2.945/3.35,sd=T=>T.map(([d,v]
    /* the nose's lower jaw (silver below, red lip above) */
    {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.86*Math.cos(t),1.1+.5*Math.sin(t),.03));}poly(o,SV,true);}
    lamps(pt,poly,5.6,1.1);}};}
-const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5')),ME6=buildModel(specE6());
+
+/* E8 (Tsubasa): the newest mini-shinkansen, same 2.945 m section and car lengths as the E6 but a short 9 m nose. Shape from the
+   E5 tables compressed to 9 m (no full drawing available); livery and openings from a side elevation and photos: Fujimurasaki
+   purple nose and roof, a Yamabuki yellow band sweeping down the nose side and across the front over the silver lower jaw. */
+function specE8(){const B=specE5('e5'),kd=9/15,kw=2.945/3.35,sd=T=>T.map(([d,v])=>[d*kd,v]);
+ return {...B,LN:9,bog:[5.7,19.85],midBog:7.075,fair:[[[-1.7,.2],[-1.7,.86],[1.7,.86],[1.7,.2]]],
+  NU:d=>d<2?2.2+d/2:3.2,nl:d=>d<2?2.5+2.5*d/2:5,
+  TAB_W:B.TAB_W.map(([d,v])=>[d*kd,v*kw]),TAB_T:sd(B.TAB_T),TAB_B:sd(B.TAB_B),TAB_C:sd(B.TAB_C).map(([d,v])=>[d,v*.55]),
+  decorate({S,P,len,nf,nr,xAt,zOn,lon,along,rect,pt,pf}){
+   const PU=[.95,.5,1.95],YE=[1.9,1.25,.2],SV=mul(HB,1.25);
+   const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
+   const side=(T,col)=>{for(const s of[-1,1])poly(dens(T).map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
+   const end=nf||nr;
+   along(.95,mul(PU,.9));along(Math.PI-.95,mul(PU,.9));
+   lon(3.07,PU,end?8.7:0);lon(2.74,YE,end?7.7:0);lon(1.8,mul(HB,.6),end?7:0);lon(.62,mul(HB,.45),3);
+   if(end){for(const [d,w] of[[8.5,.3],[10.7,.38]]){const x=xAt(d);rect(x-w,x+w,1.25,3.0,mul(HB,1.2));}
+    for(const d of[13.3,14.45,15.6,16.75,17.9,19.05,20.2]){const x=xAt(d);rect(x-.28,x+.28,2.0,2.5,mul(HB,.9));}}
+   else{const x0=-len/2+1.7,x1=len/2-1.7;rect(x0-.35,x0+.35,1.25,3.0,mul(HB,1.2));rect(x1-.35,x1+.35,1.25,3.0,mul(HB,1.2));
+    for(let x=x0+1.6;x<=x1-1.6+1e-6;x+=.98)rect(x-.25,x+.25,2.0,2.5,mul(HB,.9));}
+   if(!end)return;
+   /* purple/yellow boundary and the band's lower edge, sweeping from the front lip up to the roof line */
+   side([[.15,1.16],[1.5,1.22],[2.9,1.33],[4,1.5],[5,1.74],[5.8,2.0],[6.6,2.32],[7.7,2.74],[8.7,3.0],[9.5,3.07]],PU);
+   side([[.15,1.06],[1.5,1.1],[2.9,1.16],[4,1.3],[5,1.5],[5.8,1.75],[6.6,2.07],[7.7,2.57],[8.4,2.74]],YE);
+   /* cab: wraparound windscreen 2.9-6.5 m */
+   {const G=[[3.0,0],[3.1,.4],[3.5,.68],[4.4,.8],[5.6,.8],[6.4,.66],[6.5,0]],o=[];for(const [d,z] of G)o.push(pt(d,z,.06));for(const [d,z] of G.slice().reverse())o.push(pt(d,-z,.06));poly(o,mul(HC,2.5),true);}
+   {let p=null;for(let k=0;k<=12;k++){const q=pt(3.0*k/12,0,.03);if(p)S.add(p,q,mul(PU,.8));p=q;}}
+   /* front: the yellow band across the top of the silver jaw */
+   {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.86*Math.cos(t),1.08+.42*Math.sin(t),.03));}poly(o,SV,true);}
+   poly(Array.from({length:25},(_,k)=>pf(-.84+1.68*k/24,1.13,.035)),YE);
+   lamps(pt,poly,4.6,1.0);}};}
+const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5')),ME6=buildModel(specE6()),ME8=buildModel(specE8());
 
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const HCUT={value:0};/* on board, the camera is inside a car: drop silhouette shells within this distance */
@@ -700,7 +732,8 @@ const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix
 /* model families: shared shape (occluders, outline hulls) and per-livery line templates; lamp = headlight [x from car centre, height, z] */
 const FAMS={n7:{M:M700N,end:27,mid:25,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
  e5:{M:ME5,end:26.25,mid:25,livs:{e5:ME5,h5:MH5},lamp:[26.25/2-6.4,2.2,1.27],ax:5.25,cab:[7.6,2.95,-.3]},
- e6:{M:ME6,end:23.075,mid:20.5,livs:{e6:ME6},lamp:[23.075/2-5.6,2.2,1.12],ax:5.75,cab:[6.6,2.85,-.28]}};
+ e6:{M:ME6,end:23.075,mid:20.5,livs:{e6:ME6},lamp:[23.075/2-5.6,2.2,1.12],ax:5.75,cab:[6.6,2.85,-.28]},
+ e8:{M:ME8,end:23.075,mid:20.5,livs:{e8:ME8},lamp:[23.075/2-4.6,2.0,1.02],ax:5.7,cab:[5.4,2.7,-.28]}};
 const LIVFAM={};for(const f in FAMS)for(const l in FAMS[f].livs)LIVFAM[l]=f;
 const NMAX=160,NT={lines:{},occ:{},hull:{}},DYN=THREE.DynamicDrawUsage;
 for(const fam in FAMS){const F=FAMS[fam],CARGS={front:[F.end,true,false],mid:[F.mid,false,false],rear:[F.end,false,true]};NT.occ[fam]={};NT.hull[fam]={};for(const l in F.livs)NT.lines[l]={};
@@ -765,10 +798,10 @@ const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];
-  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':stk==='E6'?'e6':'n7',endL=FAMS[fam].end,midL=FAMS[fam].mid;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:midL);
+  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':stk==='E6'?'e6':stk==='E8'?'e8':'n7',endL=FAMS[fam].end,midL=FAMS[fam].mid;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:midL);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:stk,dest:t.dest,
-   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):fam==='e6'?'e6':cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
+   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):fam==='e6'||fam==='e8'?fam:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
