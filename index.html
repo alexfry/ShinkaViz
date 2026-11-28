@@ -428,7 +428,7 @@ function buildModel(SP){const {LN,TAB_W,TAB_T,TAB_C,TAB_B}=SP,NUf=typeof SP.NU==
  const hwAt=(H,y)=>{let m=-1;for(let i=0;i<H.length-1;i++){const [z0,y0]=H[i],[z1,y1]=H[i+1];if((y-y0)*(y-y1)<=0&&y0!==y1){const z=z0+(z1-z0)*(y-y0)/(y1-y0);if(z>m)m=z;}}return m;};
  const ringOf=p=>{if(!p.half){const r=[];for(let m=0;m<MR;m++){const q=sec(m/MR*Math.PI*2,p,0);r.push([q[0],q[1]]);}return r;}
   const H=p.half,L=H.map(([z,h])=>[-z,h]),Ru=H.slice().reverse();return L.concat(Ru.slice(1,-1));};
-function bogiesOf(len,nf,nr){const b=SP.bog;return nf?[len/2-b[0],len/2-b[1]]:nr?[-len/2+b[0],-len/2+b[1]]:[-8.75,8.75];}
+function bogiesOf(len,nf,nr){const b=SP.bog;return nf?[len/2-b[0],len/2-b[1]]:nr?[-len/2+b[0],-len/2+b[1]]:[-(SP.midBog||8.75),SP.midBog||8.75];}
 function frontPoint(len,nf,nr,z,y){for(let d=0;d<=LN;d+=.02){const x=nf?len/2-d:-len/2+d,p=prof(x,len,nf,nr);if(y<p[1])continue;
   let inside;if(p.half)inside=Math.abs(z)<=hwAt(p.half,y);else if(y>=p[5])inside=y<=topAt(p,z,0)&&Math.abs(z)<=p[0]/2;else{const q=(p[5]-y)/(p[5]-p[1]);inside=q<1&&Math.abs(z)<=p[0]/2*Math.pow(1-Math.pow(q,p[6]),1/p[6]);}
   if(inside)return [x,y,z];}return null;}
@@ -627,8 +627,39 @@ function specE5(liv){return {LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut
   {let p=null;for(let k=0;k<=16;k++){const q=pt(5.05*k/16,0,.03);if(p)S.add(p,q,mul(GR,1.5));p=q;}}
   /* front view: the nose tip and the headlight clusters either side of it */
   {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.99*Math.cos(t),1.13+.55*Math.sin(t),.03));}poly(o,WH,true);}
-  for(const sd of[-1,1]){const o=[];for(let k=0;k<32;k++){const t=k/32*Math.PI*2;o.push(pf(sd*.58+.24*Math.cos(t),.92+.1*Math.sin(t),.04));}poly(o,mul(HC,2.2),true);}}};}
-const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5'));
+  lamps(pt,poly,6.4,1.25);}};}
+/* headlights sit in the shoulders either side of the cab canopy, not in the nose (E5, H5, E6 alike) */
+function lamps(pt,poly,d,z){for(const sd of[-1,1]){const o=[];for(let k=0;k<24;k++){const t=k/24*Math.PI*2;o.push(pt(d+.38*Math.cos(t),sd*(z+.12*Math.sin(t)),.05));}poly(o,mul(HC,2.3),true);}}
+/* E6 (Komachi): the E5's mini-shinkansen sibling, 2.945 m wide, 13 m nose, 23.075 m end cars and 20.5 m intermediates
+   (14.15 m bogie centres). Shape: the E5 tables shortened and narrowed; livery and openings from a side elevation and photos:
+   Akane red roof and nose top, a silver arrow along the nose side pointing at the headlight, a red flash beneath it. */
+function specE6(){const B=specE5('e5'),kd=13/15,kw=2.945/3.35,sd=T=>T.map(([d,v])=>[d*kd,v]);
+ return {...B,LN:13,bog:[5.75,19.9],midBog:7.075,fair:[[[-1.7,.2],[-1.7,.86],[1.7,.86],[1.7,.2]]],
+  NU:d=>d<2.6?2.2+d/2.6:3.2,nl:d=>d<2.6?2.5+2.5*d/2.6:5,
+  TAB_W:B.TAB_W.map(([d,v])=>[d*kd,v*kw]),TAB_T:sd(B.TAB_T),TAB_B:sd(B.TAB_B),TAB_C:sd(B.TAB_C).map(([d,v])=>[d,v*.9]),
+  decorate({S,P,len,nf,nr,xAt,zOn,lon,along,rect,pt,pf}){
+   const RD=[1.9,.28,.5],SV=mul(HB,1.25);
+   const poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
+   const side=(T,col)=>{for(const s of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,s*(z-.01)];}),col);};
+   const end=nf||nr;
+   along(.95,mul(RD,.9));along(Math.PI-.95,mul(RD,.9));lon(3.2,RD,end?15.5:0);lon(1.8,mul(HB,.7),end?9.5:0);lon(.62,mul(HB,.45),3);
+   if(end){for(const [d,w] of[[11.5,.3],[21.1,.36]]){const x=xAt(d);rect(x-w,x+w,1.25,3.15,mul(HB,1.2));}
+    for(const d of[13.6,14.75,15.9,17.05,18.2,19.4]){const x=xAt(d);rect(x-.27,x+.27,2.0,2.52,mul(HB,.9));}}
+   else{const x0=-len/2+1.7,x1=len/2-1.7;rect(x0-.35,x0+.35,1.25,3.15,mul(HB,1.2));rect(x1-.35,x1+.35,1.25,3.15,mul(HB,1.2));
+    for(let x=x0+1.6;x<=x1-1.6+1e-6;x+=.98)rect(x-.25,x+.25,2.0,2.52,mul(HB,.9));}
+   if(!end)return;
+   /* red/silver boundary sweeping up from the arrow's point to the roof band; the red flash under the arrow */
+   side([[3.6,1.86],[4.5,2.02],[6,2.35],[7.1,2.62],[9,2.86],[11,3.02],[13,3.13],[15.5,3.2]],RD);
+   side([[3.6,1.86],[6,1.83],[9.4,1.79]],mul(RD,.8));side([[2.4,1.45],[5,1.5],[7.5,1.62],[9.4,1.79]],RD);
+   /* cab: canopy base and the big wraparound windscreen (4.2-7.3 m) */
+   const loop=(d0,d1,hw,peak,col,g)=>{for(const s of[-1,1]){let p=null;for(let k=0;k<=32;k++){const u=k/32,f=u<peak?Math.sin(Math.PI/2*u/peak):Math.cos(Math.PI/2*(u-peak)/(1-peak)),q=pt(d0+(d1-d0)*u,s*hw*Math.pow(Math.max(0,f),.5),g);if(p)S.add(p,q,col);p=q;}}};
+   loop(4.0,9.0,.82,.4,mul(RD,.9),.04);
+   {const G=[[4.3,0],[4.4,.35],[4.8,.6],[5.6,.7],[6.6,.7],[7.3,.6],[7.3,0]],o=[];for(const [d,z] of G)o.push(pt(d,z,.06));for(const [d,z] of G.slice().reverse())o.push(pt(d,-z,.06));poly(o,mul(HC,2.5),true);}
+   {let p=null;for(let k=0;k<=16;k++){const q=pt(4.0*k/16,0,.03);if(p)S.add(p,q,mul(RD,.8));p=q;}}
+   /* the nose's lower jaw (silver below, red lip above) */
+   {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.86*Math.cos(t),1.1+.5*Math.sin(t),.03));}poly(o,SV,true);}
+   lamps(pt,poly,5.6,1.1);}};}
+const SPECE5=specE5('e5'),ME5=buildModel(SPECE5),MH5=buildModel(specE5('h5')),ME6=buildModel(specE6());
 
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const HCUT={value:0};/* on board, the camera is inside a car: drop silhouette shells within this distance */
@@ -667,11 +698,12 @@ const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix
  vertexShader:`attribute float ik;uniform float uPix;varying float vK,vD;void main(){vec4 mv=modelViewMatrix*(instanceMatrix*vec4(position,1.));vD=length(mv.xyz);vec3 n=normalize(normalMatrix*(mat3(instanceMatrix)*normal));mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;vK=ik;}`,
  fragmentShader:`uniform vec3 uCol;uniform float uScale,uCut;varying float vK,vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*vK,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
 /* model families: shared shape (occluders, outline hulls) and per-livery line templates; lamp = headlight [x from car centre, height, z] */
-const FAMS={n7:{M:M700N,end:27,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
- e5:{M:ME5,end:26.25,livs:{e5:ME5,h5:MH5},lamp:[26.25/2-.45,.92,.58],ax:5.25,cab:[7.6,2.95,-.3]}};
+const FAMS={n7:{M:M700N,end:27,mid:25,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
+ e5:{M:ME5,end:26.25,mid:25,livs:{e5:ME5,h5:MH5},lamp:[26.25/2-6.4,2.2,1.27],ax:5.25,cab:[7.6,2.95,-.3]},
+ e6:{M:ME6,end:23.075,mid:20.5,livs:{e6:ME6},lamp:[23.075/2-5.6,2.2,1.12],ax:5.75,cab:[6.6,2.85,-.28]}};
 const LIVFAM={};for(const f in FAMS)for(const l in FAMS[f].livs)LIVFAM[l]=f;
 const NMAX=160,NT={lines:{},occ:{},hull:{}},DYN=THREE.DynamicDrawUsage;
-for(const fam in FAMS){const F=FAMS[fam],CARGS={front:[F.end,true,false],mid:[25,false,false],rear:[F.end,false,true]};NT.occ[fam]={};NT.hull[fam]={};for(const l in F.livs)NT.lines[l]={};
+for(const fam in FAMS){const F=FAMS[fam],CARGS={front:[F.end,true,false],mid:[F.mid,false,false],rear:[F.end,false,true]};NT.occ[fam]={};NT.hull[fam]={};for(const l in F.livs)NT.lines[l]={};
 for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=F.M.carGeo(L,nf,nr);
  const o=new THREE.InstancedMesh(g,occMat,NMAX);o.instanceMatrix.setUsage(DYN);o.count=0;o.frustumCulled=false;o.layers.set(1);trainRoot.add(o);NT.occ[fam][t]={m:o,n:0};
  const hg=g.clone(),hk=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);hg.setAttribute('ik',hk);
@@ -733,10 +765,10 @@ const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];
-  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':'n7',endL=FAMS[fam].end;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:25);
+  const stk=t.stock||(type==='hayabusa'&&H5_HAYABUSA.has(t.num)?'H5':DEF_STOCK[type])||null,fam=stk==='E5'||stk==='H5'?'e5':stk==='E6'?'e6':'n7',endL=FAMS[fam].end,midL=FAMS[fam].mid;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:midL);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:stk,dest:t.dest,
-   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
+   fam,liv:fam==='e5'?(stk==='H5'?'h5':'e5'):fam==='e6'?'e6':cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
@@ -799,8 +831,9 @@ function drawN700(tr,st){const head=st.s+tr.dir*tr.len/2,n=tr.cl.length;let acc=
   for(const [x,s] of secs){const cr=[[x,s[0],-s[2]],[x,s[0],s[2]],[x,s[1],s[2]],[x,s[1],-s[2]]];for(let j=0;j<4;j++){wv(cr[j],P,k);wv(cr[(j+1)%4],P,k);if(prev){wv(prev[j],P,k);wv(cr[j],P,k);}}prev=cr;}
   const xa=c===n-1?-h+9:-h,xb=c===0?h-9:h,mx=(xa+xb)/2,lx=xb-xa,oy=2.1;
   M4.set(P.fx*lx,P.ux*2.95,P.sx*3.36,P.cx+P.fx*mx+P.ux*oy,P.fy*lx,P.uy*2.95,P.sy*3.36,P.cy+P.fy*mx+P.uy*oy,P.fz*lx,P.uz*2.95,P.sz*3.36,P.cz+P.fz*mx+P.uz*oy,0,0,0,1);io.setMatrixAt(ni++,M4);
-  if(c===0)for(const z of[-.22,.22])light(P,h-.2,1.27,z,[5,5,4.6],4);
-  if(c===n-1)for(const z of[-.22,.22])light(P,-h+.2,1.27,z,[4,.2,.1],3.5);}}
+  {const lp=FAMS[tr.fam||'n7'].lamp,lx=lp[0]+(L-FAMS[tr.fam||'n7'].end)/2;
+   if(c===0)for(const z of[-lp[2],lp[2]])light(P,lx,lp[1],z,[5,5,4.6],4);
+   if(c===n-1)for(const z of[-lp[2],lp[2]])light(P,-lx,lp[1],z,[4,.2,.1],3.5);}}}
 let tf=1;
 function placeHero(tr,st,cars,dt){const head=st.s+tr.dir*tr.len/2;let acc=0;
  for(let c=0;c<8;c++){const L=tr.cl[c],cs=head-tr.dir*(acc+L/2);acc+=L+.6;const P=pose(tr,cs,PQ);
