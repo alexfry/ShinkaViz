@@ -688,11 +688,39 @@ function ttTrains(){const out=[];
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
-   liv:cars>=16?'noz':'kyu',ev:[]};
+   liv:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
- return out;}
+ coupleTrains(out);return out;}
+/* Trains that run coupled (Hayabusa+Komachi, Yamabiko+Tsubasa, ...) share times over the common stretch, so they would sit on top
+   of each other. Find them (from the timetable's own note, or identical times over two or more consecutive stops), then slide
+   each half of the pair along its route by half the other's length so the two run nose to tail as one consist. The mini-shinkansen
+   rides at the north end for Komachi and the Tokyo end for Tsubasa; otherwise the first train listed leads. */
+function coupleTrains(list){const key=(a,b,c,d)=>a+'|'+b+'|'+Math.round(c/30)+'|'+Math.round(d/30),seen=new Map(),pairs=new Map();
+ const byNum=new Map(list.map(t=>[t.type+t.num,t]));
+ for(const t of list){if(t.couple){const o=byNum.get(t.couple[0]+t.couple[1]);if(o&&o!==t&&!pairs.has(t)&&!pairs.has(o)){pairs.set(t,o);pairs.set(o,t);}}}
+ for(const t of list){if(pairs.has(t))continue;for(let j=0;j<t.ev.length-1;j++){const a=t.ev[j],b=t.ev[j+1],K=key(a.k,b.k,a.dep,b.arr),o=seen.get(K);
+  if(o&&o!==t&&!pairs.has(o)&&o.down===t.down){pairs.set(t,o);pairs.set(o,t);break;}seen.set(K,t);}}
+ const done=new Set();
+ for(const [a,b] of pairs){if(done.has(a))continue;done.add(a);done.add(b);
+  /* the shared stretch: consecutive common stops where the two keep the same times */
+  const same=(x,y)=>Math.abs(x-y)<45,shared=[];
+  for(let i=0;i<a.ev.length;i++){const e=a.ev[i],f=b.evByK.get(e.k);if(!f)continue;const j=b.ev.indexOf(f);
+   const prevA=a.ev[i-1],prevB=b.ev[j-1],nxtA=a.ev[i+1],nxtB=b.ev[j+1];
+   const inbound=prevA&&prevB&&prevA.k===prevB.k&&same(e.arr,f.arr),outbound=nxtA&&nxtB&&nxtA.k===nxtB.k&&same(e.dep,f.dep);
+   if(inbound||outbound)shared.push([e,f]);}
+  if(shared.length<2)continue;
+  /* which end: where they part, the front one leaves first; where they join, the front one arrived first */
+  let front=null;const [lA,lB]=shared[shared.length-1],[fA,fB]=shared[0];
+  if(a.ev[a.ev.length-1]!==lA&&b.ev[b.ev.length-1]!==lB&&!same(lA.dep,lB.dep))front=lA.dep<lB.dep?a:b;
+  else if(a.ev[0]!==fA&&b.ev[0]!==fB&&!same(fA.arr,fB.arr))front=fA.arr<fB.arr?a:b;
+  const mini=t=>t.type==='komachi'?t.down>0:t.type==='tsubasa'?t.down<0:null;
+  if(!front)front=mini(a)!==null?(mini(a)?a:b):mini(b)!==null?(mini(b)?b:a):a;
+  const back=front===a?b:a,dF=(back.len+1)/2,dB=(front.len+1)/2;
+  for(const [e,f] of shared){const eF=front===a?e:f,eB=front===a?f:e;eF.s+=dF;eB.s-=dB;}
+  for(const t of [a,b]){for(let j=0;j<t.ev.length-1;j++){const e=t.ev[j],n=t.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(t.sv.vm||300)/3.6);}}
+  front.cpl=back;back.cpl=front;front.cplFront=true;}}
 const trains=TT?ttTrains():[];let hero=null;
 if(!trains.length){const fast=[];
 for(let h=6;h<22;h++)for(const [m,ty] of[[0,'nozomi'],[5,'sakura'],[20,'nozomi'],[40,'nozomi']]){const a=mkTrain(ty,1);planFixed(a,h*3600+m*60);const b=mkTrain(ty,-1);planFixed(b,h*3600+(m+3)*60);fast.push(a,b);}
@@ -894,7 +922,7 @@ const SVN={nozomi:['のぞみ','Nozomi'],hikari:['ひかり','Hikari'],mizuho:['
  kamome:['かもめ','Kamome'],kagayaki:['かがやき','Kagayaki'],hakutaka:['はくたか','Hakutaka'],tsurugi:['つるぎ','Tsurugi'],asama:['あさま','Asama'],hayabusa:['はやぶさ','Hayabusa'],hayate:['はやて','Hayate'],
  yamabiko:['やまびこ','Yamabiko'],nasuno:['なすの','Nasuno'],komachi:['こまち','Komachi'],tsubasa:['つばさ','Tsubasa'],toki:['とき','Toki'],tanigawa:['たにがわ','Tanigawa']};
 /* name with number ("のぞみ 1号", "Nozomi 1"), destination beyond the Sanyo line where known, and rolling stock */
-const tName=tr=>{const n=SVN[tr.type];return tr.num?[`${n[0]}${tr.num}号`,`${n[1]} ${tr.num}`]:n;};
+const tName1=tr=>{const n=SVN[tr.type];return tr.num?[`${n[0]}${tr.num}号`,`${n[1]} ${tr.num}`]:n;},tName=tr=>{const a=tName1(tr);if(!tr.cpl)return a;const b=tName1(tr.cpl);return [a[0]+'＋'+b[0],a[1]+' + '+b[1]];};
 const tDest=tr=>tr.dest?{ja:tr.dest,name:DEST_EN[tr.dest]||(stations.find(x=>x.ja===tr.dest)||{}).name||tr.dest}:stations[tr.ks[tr.ks.length-1]];
 const tStock=tr=>tr.hero?['500系','500 series']:/^[EWH]\d/.test(tr.stock||'')?[tr.stock+'系',tr.stock+' series']:tr.stock==='700'?['700系','700 series']:tr.stock==='N700S'?['N700S','N700S']:tr.stock==='N700A'?['N700A','N700A']:tr.stock==='800'?['800系','800 series']:(tr.liv||(tr.type==='nozomi'?'noz':'kyu'))==='noz'?['N700A','N700A']:['N700系 7000/8000','N700 7000/8000'];let boardT=0;
 /* which way a train passes station k, relative to that station's platform line: +1 towards the line's last station */
