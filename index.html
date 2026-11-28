@@ -1071,7 +1071,7 @@ const tele=d=>Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));
 const SHOTS={
  flyby:{ja:'通過',en:'Flyby',ok:()=>fs.stop<0,
   start(){let s=heroHead()+FT.dir*(260+Math.random()*200);for(let k=0;k<12&&tunT(FT,s)>.5;k++)s+=FT.dir*300;cine.s=Math.min(Math.max(s,-300),FT.R.U+300);const mv=[[7+Math.random()*4,0,.3],[1.5,0,1.8+Math.random()*.8],[2,0,-1.6],[2.5,-2.2,.15]][Math.random()*4|0];cine.mv=mv;cine.sb=cine.s;beside(cine.s,(mv[1]<0?18:12)+Math.random()*10,mv[2]<0?9+Math.random()*4:1.5+Math.random()*3,cine.p);},
-  upd(t){cam.position.fromArray(moved(t));aimRel(autoEnd(cine.s),1.8);cam.fov=Math.min(55,Math.max(22,tele(cam.position.distanceTo(T))));return FT.dir*(heroHead()-FT.dir*FT.len-cine.s)>70||t>13;}},
+  upd(t){cam.position.fromArray(moved(t));aimRel(autoEnd(cine.s),1.8);cam.fov=Math.min(65,Math.max(40,tele(cam.position.distanceTo(T))*2.4));return FT.dir*(heroHead()-FT.dir*FT.len-cine.s)>70||t>13;}},
  track:{ja:'並走',en:'Tracking',ok:()=>fs.stop<0,start(){cine.u=Math.random()<.5?0:1;},
   upd(t){const f=Math.min(1,t/10),u=cine.u?1-f:f,s=heroHead()-FT.dir*FT.len*(.95-.85*u);cam.position.fromArray(beside(s,13,2.2,Q));T.fromArray(onTrain(s+FT.dir*35,1.8,Q2));cam.fov=40;return t>10;}},
  catch:{ja:'追いつく',en:'Aerial, catching up',ok:()=>fs.stop<0&&fs.v>40,
@@ -1080,6 +1080,10 @@ const SHOTS={
  leave:{ja:'置き去り',en:'Aerial, left behind',ok:()=>fs.stop<0&&fs.v>40,
   start(){cine.v=Math.max(0,fs.v-30);cine.s0=heroHead()+FT.dir*40;cine.sim0=simT;cine.h=60+Math.random()*50;cine.lat=40+Math.random()*25;},
   upd(t){const s=cine.s0+FT.dir*cine.v*(simT-cine.sim0);cam.position.fromArray(beside(s,cine.lat,cine.h,Q));aimRel(REL.tail()-20,1.8);cam.fov=38;return t>14||FT.dir*(fs.s-FT.dir*FT.len/2-s)>700;}},
+ /* the long lens belongs far from the line: 450-900 m off to one side, a little raised, panning to follow the head */
+ far:{ja:'望遠',en:'Long lens',ok:()=>fs.stop<0,
+  start(){cine.s=heroHead()+FT.dir*(150+Math.random()*250);cine.lat=450+Math.random()*450;cine.h=8+Math.random()*35;beside(cine.s,cine.lat,cine.h,cine.p);},
+  upd(t){cam.position.fromArray(cine.p);aimRel(REL.head()+15,1.8);cam.fov=Math.min(14,Math.max(2.5,tele(cam.position.distanceTo(T))*1.6));return t>11;}},
  heli:{ja:'空撮',en:'Aerial',ok:()=>true,start(){},
   upd(t){const P=aimRel(cine.end,0),a=cine.yaw+t*.07;cam.position.set(P[0]+Math.cos(a)*380,P[1]+170,P[2]+Math.sin(a)*380);cam.fov=32;return t>13;}},
  nose:{ja:'先頭',en:'Nose',ok:()=>fs.stop<0,start(){},
@@ -1088,16 +1092,16 @@ const SHOTS={
   upd(t){const P=aimRel(cine.end,0);cam.position.set(P[0]-FP0.fx*60,P[1]+240-t*4,P[2]-FP0.fz*60);cam.fov=38;return t>8;}},
  portal:{ja:'トンネル',en:'Tunnel portal',ok:()=>fs.stop<0&&findPortal()!==null,
   start(){cine.s=findPortal();cine.sb=cine.s-FT.dir*120;cine.mv=[1.6,0,1.3];beside(cine.sb,14,4,cine.p);},
-  upd(t){cam.position.fromArray(moved(t));aimRel(Math.max(REL.head(),FT.dir*(heroHead()-cine.s)+6),1.8);cam.fov=tele(cam.position.distanceTo(T));return FT.dir*(heroHead()-cine.s)>FT.len+20||t>25;}},
+  upd(t){cam.position.fromArray(moved(t));aimRel(Math.max(REL.head(),FT.dir*(heroHead()-cine.s)+6),1.8);cam.fov=Math.min(60,Math.max(36,tele(cam.position.distanceTo(T))*2.4));return FT.dir*(heroHead()-cine.s)>FT.len+20||t>25;}},
  arrive:{ja:'到着',en:'Arrival',ok:()=>{const ne=FT.ev[fs.i+1];return fs.stop<0&&!!ne&&(ne.arr-simT)/Math.max(speed,1)<15;},
   start(){const ne=FT.ev[fs.i+1],k=ne.k,o=FT.type==='kodama'&&stations[k].major?13.6:9.7;cine.k=k;cine.sb=ne.s+FT.dir*(FT.len/2+25);cine.mv=[1.1,0,.12];cine.s=ne.s;atT(FT,ne.s+FT.dir*(FT.len/2+25),o,cine.p);cine.p[1]+=2.85;},
-  upd(t){cam.position.fromArray(moved(t));aimRel(REL.head(),1.6);const d=cam.position.distanceTo(T);cam.fov=Math.min(50,Math.max(20,tele(d)*1.4));return(fs.stop===cine.k&&t>6)||t>25;}},
+  upd(t){cam.position.fromArray(moved(t));aimRel(REL.head(),1.6);const d=cam.position.distanceTo(T);cam.fov=Math.min(55,Math.max(32,tele(d)*2.2));return(fs.stop===cine.k&&t>6)||t>25;}},
  station:{ja:'停車',en:'Station',ok:()=>fs.stop>=0,
   start(){cine.sb=fs.s+FT.dir*(FT.len/2+12);cine.mv=[-1.3,0,0];const k=fs.stop,m=stations[k].major?11.65:10.9;atT(FT,fs.s+FT.dir*(FT.len/2+12),m,cine.p);cine.p[1]+=2.6;},
   upd(t){cam.position.fromArray(moved(t));T.set(FP0.cx-FP0.fx*30,FP0.cy+2,FP0.cz-FP0.fz*30);cam.fov=50;return(fs.stop<0&&t>3)||t>16;}},
 };
 function nextShot(now){if(SHOTS.arrive.ok()&&cine.last!=='arrive'){cine.shot=cine.last='arrive';cine.side=1;cine.t0=now;cine.ar=null;SHOTS.arrive.start();clearP=true;$('#shot').textContent=`${SHOTS.arrive.ja} ${SHOTS.arrive.en}`;return;}
- const pool=fs.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal','catch','leave','catch','leave'];
+ const pool=fs.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal','catch','leave','far','flyby'];
  let c=pool.filter(k=>k!==cine.last&&SHOTS[k].ok());if(!c.length)c=['heli'];
  startShot(c.includes('portal')&&Math.random()<.5?'portal':c.includes('station')?'station':c[Math.random()*c.length|0],now);}
 function startShot(k,now){cine.shot=k;
@@ -1126,12 +1130,12 @@ function tourHop(now){const pk=tourPick();if(!pk){TOUR.n=0;nextShot(now);return;
  setFocus(tr);mode='cine';TOUR.n=0;
  if(ev.shot==='arrive'&&SHOTS.arrive.ok())startShot('arrive',now);else if(SHOTS[ev.shot]&&SHOTS[ev.shot].ok())startShot(ev.shot,now);else nextShot(now);
  const w=ev.why,nm=tName(tr);TOUR.why=`${w[0]} ${w[1]}${w[2]?' · '+w[2].name:''} — ${nm[1]}`;
- TOUR.fly={p0,t0,f0,t:now,dur:Math.min(9,Math.max(3,2.5+d/40000))*1000};}
+ TOUR.fly={p0,t0,f0,t:now,dur:Math.min(14,Math.max(5,4+d/25000))*1000};}
 function tourCam(now){
- if(TOUR.fly){const F=TOUR.fly,u=Math.min(1,(now-F.t)/F.dur),e=u*u*(3-2*u);
+ if(TOUR.fly){const F=TOUR.fly,u=Math.min(1,(now-F.t)/F.dur),e=u*u*u*(u*(u*6-15)+10),lift=Math.pow(Math.sin(Math.PI*u),1.5);   /* smootherstep travel, a soft rise and fall */
   cine.t0=now;SHOTS[cine.shot].upd(0);const p1=cam.position.clone(),t1=T.clone(),f1=cam.fov,dist=F.p0.distanceTo(p1);
-  cam.position.lerpVectors(F.p0,p1,e);cam.position.y+=Math.min(dist*.3,25000)*Math.sin(Math.PI*u);T.lerpVectors(F.t0,t1,e);
-  cam.fov=f1+(F.f0-f1)*(1-e)*(1-e)+20*Math.sin(Math.PI*u)*Math.min(1,dist/20000);
+  cam.position.lerpVectors(F.p0,p1,e);cam.position.y+=Math.min(dist*.3,25000)*lift;T.lerpVectors(F.t0,t1,e);
+  cam.fov=f1+(F.f0-f1)*(1-e)+20*lift*Math.min(1,dist/20000);
   $('#shot').textContent=TOUR.why;if(u>=1){TOUR.fly=null;cine.t0=now;}
   cam.near=Math.max(.5,cam.position.distanceTo(T)*.02);cam.far=300000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;return;}
  const done=!cine.shot||SHOTS[cine.shot].upd((now-cine.t0)/1000);
