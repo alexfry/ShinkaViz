@@ -914,13 +914,17 @@ let mode='cine',speed=1,anim=null,ovf=0;
 const ORB={yaw:.55,pitch:.12,dist:40,min:12,max:2500000};
 /* overview panning: an east/south offset of the camera's target, which fades in as the camera pulls out to the overview */
 const PAN={x:0,z:0},OVW=d=>ss(12000,30000,d);
+/* glide: when the target changes (new train, pan cleared), OFF holds the old target's offset from the new one and decays,
+   so the camera eases across instead of jumping */
+const OFF={x:0,y:0,z:0};let glideFrom=null,lastOrbNow=0;
+function nearestTrain(x,z){let best=null,bd=Infinity;for(const tr of trains){if(!runningAt(tr,simT))continue;const st=stateAt(tr,simT,SX);if(!st)continue;atT(tr,st.s,0,Q);const d=Math.hypot(Q[0]-x,Q[2]-z);if(d<bd){bd=d;best=tr;}}return [best,bd];}
 const baseT=d=>{const P=FP0,k=ss(60000,260000,d);return [lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cz+P.uz*1.6,CZ,k)];};
 /* zoom by factor f keeping the ground point under the cursor fixed on screen (overview only; closer in it zooms on the train) */
 const RC=new THREE.Raycaster(),NDC=new THREE.Vector2(),GP=new THREE.Plane(new THREE.Vector3(0,1,0),0),HIT=new THREE.Vector3();
 function groundAt(cx,cy){const r=canvas.getBoundingClientRect();NDC.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);RC.setFromCamera(NDC,cam);GP.constant=-T.y;return RC.ray.intersectPlane(GP,HIT)?[HIT.x,HIT.z]:null;}
 function zoomAt(cx,cy,f){const d0=ORB.dist,d1=Math.min(ORB.max,Math.max(ORB.min,d0*f));f=d1/d0;
  const w=OVW(d0);if(w>0){const r=canvas.getBoundingClientRect();NDC.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);RC.setFromCamera(NDC,cam);GP.constant=-T.y;
-  if(RC.ray.intersectPlane(GP,HIT)){const b0=baseT(d0),b1=baseT(d1),w1=OVW(d1)||1;
+  if(RC.ray.intersectPlane(GP,HIT)){const b1=baseT(d1),w1=1;
    const tx=(T.x-HIT.x)*(f-1)+T.x,tz=(T.z-HIT.z)*(f-1)+T.z;PAN.x=(tx-b1[0])/w1;PAN.z=(tz-b1[1])/w1;}}
  ORB.dist=d1;ORB.pitch=clampPitch(ORB.pitch);}
 const T=new THREE.Vector3(),hs0={s:0,v:0,stop:-1,i:0};
@@ -934,14 +938,20 @@ const wf=d=>1-ss(2000,20000,d); /* close in, yaw follows the train's heading; fa
 const HALFX=Math.max(300000,(maxX-minX)*.55),HALFZ=Math.max(150000,(maxZ-minZ)*.55),overDist=()=>Math.min(ORB.max,Math.max(320000,Math.max(HALFX,HALFZ*cam.aspect)/(Math.tan(25*Math.PI/180)*Math.max(cam.aspect,.3))));
 const PRESET={chase:()=>({yaw:Math.atan2(FP0.fz,FP0.fx)+.55,pitch:.12,dist:40}),over:()=>({yaw:Math.PI/2,pitch:1.05,dist:overDist()})};
 function flyTo(b,dur){anim={a:{yaw:ORB.yaw,pitch:ORB.pitch,dist:ORB.dist},b,t0:performance.now(),dur};}
-function orbitCam(now){const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===null?hd:wrapA(hd-lastHd)*wf(ORB.dist);lastHd=hd;
+function orbitCam(now){const dt=Math.min(.1,Math.max(0,(now-lastOrbNow)/1000));lastOrbNow=now;
+ /* zooming in from a panned overview: hand the camera to the train nearest the middle of the view */
+ if(ORB.dist<30000&&(PAN.x||PAN.z)&&!anim){const [tr,dd]=nearestTrain(T.x,T.z);
+  if(tr&&dd<Math.max(3000,ORB.dist*1.2)){if(tr!==FT)setFocus(tr,true);else{glideFrom=T.clone();PAN.x=PAN.z=0;}}}   /* none near: stay panned over the map */
+ const P=FP0,hd=Math.atan2(P.fz,P.fx);ORB.yaw+=lastHd===null?hd:wrapA(hd-lastHd)*wf(ORB.dist);lastHd=hd;
  if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=easeIO(t),A=anim.a,B=anim.b;
   ORB.dist=Math.exp(lerp(Math.log(A.dist),Math.log(B.dist),e));ORB.pitch=lerp(A.pitch,B.pitch,e);
   ORB.yaw=lerpA(A.yaw,B.yaw,e);if(t>=1)anim=null;}
  /* pulled out to the overview, north is always up: the camera sits due south of its target (z is south) */
  ORB.yaw=lerpA(ORB.yaw,Math.PI/2,ss(12000,30000,ORB.dist));
  const d=ORB.dist,k=ss(60000,260000,d),a=ORB.yaw,cp=Math.cos(ORB.pitch);
- T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));{const w=OVW(d);T.x+=PAN.x*w;T.z+=PAN.z*w;}
+ T.set(lerp(P.cx+P.ux*1.6,CX,k),lerp(P.cy+P.uy*1.6,0,k),lerp(P.cz+P.uz*1.6,CZ,k));T.x+=PAN.x;T.z+=PAN.z;
+ if(glideFrom){const gx=glideFrom.x-T.x,gy=glideFrom.y-T.y,gz=glideFrom.z-T.z;if(Math.hypot(gx,gz)<80000){OFF.x=gx;OFF.y=gy;OFF.z=gz;}else OFF.x=OFF.y=OFF.z=0;glideFrom=null;}
+ {const f=Math.exp(-dt/.45);OFF.x*=f;OFF.y*=f;OFF.z*=f;T.x+=OFF.x;T.y+=OFF.y;T.z+=OFF.z;}
  cam.position.set(T.x+Math.cos(a)*cp*d,T.y+Math.sin(ORB.pitch)*d,T.z+Math.sin(a)*cp*d);
  cam.fov=50;cam.near=Math.max(.3,d*.05);cam.far=d*5+130000;ovf=ss(20000,300000,d);
  U.uFadeNear.value=Math.max(25000,d*3);U.uFadeFar.value=Math.max(115000,d*6);}
@@ -1029,7 +1039,7 @@ canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)re
  if(mode!=='orbit')return;anim=null;
  const ow=OVW(ORB.dist);
  if(ptrs.size===1){if(ow>.5&&!e.shiftKey&&!(e.buttons&2)){/* overview: drag the map (right-drag or shift-drag tilts) */
-   const g0=groundAt(e.clientX-dx,e.clientY-dy),g1=groundAt(e.clientX,e.clientY);if(g0&&g1){PAN.x-=(g1[0]-g0[0])/ow;PAN.z-=(g1[1]-g0[1])/ow;}}
+   const g0=groundAt(e.clientX-dx,e.clientY-dy),g1=groundAt(e.clientX,e.clientY);if(g0&&g1){PAN.x-=g1[0]-g0[0];PAN.z-=g1[1]-g0[1];}}
   else{ORB.yaw+=dx*.006;ORB.pitch=clampPitch(ORB.pitch+dy*.005);}}
  else if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch>0&&d>0)zoomAt((a[0]+b[0])/2,(a[1]+b[1])/2,pinch/d);pinch=d;}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1038,7 +1048,7 @@ canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='board'){OB.fov
 function setMode(m){if(m==='board'){mode='board';anim=null;$('#shot').textContent='';setOB(OB.view);}
  else if(m==='plat'){if(mode!=='plat'){const ne=FT.ev[Math.min(fs.i+1,FT.ev.length-1)];setPlat(fs.stop>=0?fs.stop:ne.k,1);}mode='plat';anim=null;$('#shot').textContent='';}
  else if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
- else{const b=PRESET[m]();PAN.x=PAN.z=0;if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
+ else{const b=PRESET[m]();if(mode==='orbit')glideFrom=T.clone();else OFF.x=OFF.y=OFF.z=0;PAN.x=PAN.z=0;if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m);});
 for(const g of document.querySelectorAll('.grp')){const ic=g.querySelector('.ico');ic.addEventListener('click',e=>{e.stopPropagation();const o=!g.classList.contains('open');for(const x of document.querySelectorAll('.grp'))x.classList.remove('open');g.classList.toggle('open',o);ic.setAttribute('aria-expanded',String(o));});
  g.querySelector('.seg').addEventListener('click',e=>{if(e.target.closest('button')){g.classList.remove('open');ic.setAttribute('aria-expanded','false');}});}
@@ -1082,7 +1092,7 @@ function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode===
 $('#timeGrp .cur').textContent='1×';$('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;$('#timeGrp .cur').textContent=b.textContent;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
 const glow=$('#glow');
 
-function setFocus(tr){PAN.x=PAN.z=0;if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
+function setFocus(tr,keepYaw){if(mode==='orbit')glideFrom=T.clone();PAN.x=PAN.z=0;if(lastHd!==null&&!keepYaw){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
  {fs={s:0,v:0,stop:-1,i:0};FP0={...HP0};const st=stateAt(tr,simT,FSX);if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(tr,st.s+tr.dir*(tr.len/2-tr.cl[0]/2),FP0);}}
  clearP=true;cine.shot=null;anim=null;$('#trainSel').value=String(trains.indexOf(tr));selKey='';}
 /* train selector: every running train, down trains first, in departure order */
