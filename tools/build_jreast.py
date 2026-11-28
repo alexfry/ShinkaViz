@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """JR East Shinkansen trains for one day, from timetables.jreast.co.jp (Tohoku, Hokkaido, Akita, Yamagata, Joetsu, Hokuriku).
 
-The site publishes a weekday and a weekend/holiday edition. Its "digital timetables" (timetable-v/NNN{d|u}{1|2}.html: d down,
-u up, 1 weekday, 2 weekend/holiday) list every train on a line, each linking to a train page with its stops and a calendar of
-the days it runs (bold). We read the tables for the day's edition, follow links to further tables, read each train page and
-keep the trains whose calendar includes the date. Used by build_timetable.py; standard library only."""
+Each station's list page links its Shinkansen timetables (weekday and weekend/holiday editions), which link every train
+departing there to a train page with its stops and a calendar of the days it runs (bold). We crawl from the stations linked on
+the site's front page, follow each train's stops to further stations, and keep the trains whose calendar includes the date.
+(The line-wide "digital timetables" fill in with script, so they hold no links.) Used by build_timetable.py; standard library only."""
 import re, sys, os, time, datetime
 from urllib.parse import urljoin
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_timetable import fetch, text_lines, secs, TYPES, NAMES, SERIES
 
 BASE = 'https://timetables.jreast.co.jp/'
-SEED = ['003', '004']          # Tohoku (with Hokkaido, Akita, Yamagata) and Joetsu/Hokuriku, from Tokyo's station page
 
 
 def holiday(d):
@@ -96,48 +95,68 @@ def parse(page):
     return t
 
 
-def collect(date_s, delay=0.7, show=0, limit_tables=40):
+def shinkansen_tts(url, page, suffix):
+    """A station's list page: the timetable pages of its JR East Shinkansen lines for one edition (suffix 0 weekday, 1 weekend)."""
+    out = []
+    for m in re.finditer(r'href="([^"]*/timetable/tt\d+/\d+' + suffix + r'\.html)"', page):
+        before = re.findall(r'>\s*([^<>]*?(?:新幹線|線|ライン)[^<>]{0,12}?)\s*<', page[max(0, m.start() - 3000):m.start()])
+        before = [b for b in before if '番線' not in b and 'きっぷ' not in b]
+        if before and '新幹線' in before[-1] and '東海道' not in before[-1]:
+            out.append(urljoin(url, m.group(1)))
+    return sorted(set(out))
+
+
+def collect(date_s, delay=0.7, show=0, max_stations=200):
+    """Crawl: station list pages -> their Shinkansen timetables -> train pages, whose stops link to more stations."""
     d = datetime.date(int(date_s[:4]), int(date_s[4:6]), int(date_s[6:]))
-    ed_n = '2' if d.weekday() >= 5 or holiday(d) else '1'
-    top = fetch(BASE + 'timetable/list1039.html')
-    eds = re.findall(r'/(\d{4})/timetable', top)
-    if not eds: print('JR East: no edition found', flush=True); return []
-    ed = max(eds)
-    print(f'JR East edition {ed}, {"weekend/holiday" if ed_n == "2" else "weekday"} tables', flush=True)
-    queue = [f'{BASE}{ed}/timetable-v/{n}{du}{ed_n}.html' for n in SEED for du in 'du']
-    done, trains = set(), {}
-    while queue and len(done) < limit_tables:
-        url = queue.pop(0)
-        if url in done: continue
-        done.add(url)
-        try:
-            page = fetch(url); time.sleep(delay)
-        except RuntimeError as e:
-            print('  ', e, flush=True); continue
-        hs = [urljoin(url, h) for h in re.findall(r'href="([^"]+)"', page)]
-        tr = [h for h in hs if '/train/' in h]
-        more = [h for h in hs if re.search(r'/timetable-v/\d+[du]' + ed_n + r'(_\d+)?\.html$', h) and h not in done and h not in queue]
-        for h in tr: trains.setdefault(h.split('#')[0], url)
-        print(f'  {url.rsplit("/", 1)[1]}: {len(set(tr))} trains ({len(trains)} total), {len(more)} more tables', flush=True)
-        if not tr: print('   sample:', re.sub(r'\s+', ' ', re.sub(r'<script.*?</script>|<style.*?</style>', '', page, flags=re.S))[3000:4500], flush=True)
-        queue += more
-    out, skipped, off = [], 0, 0
-    for n, u in enumerate(sorted(trains)):
+    suffix = '1' if d.weekday() >= 5 or holiday(d) else '0'
+    print(f'JR East: {"weekend/holiday" if suffix == "1" else "weekday"} timetables', flush=True)
+    top = fetch(BASE); time.sleep(delay)
+    lists = [urljoin(BASE, h) for h in re.findall(r'href="([^"]*timetable/list\d+\.html)"', top)]
+    lists.insert(0, BASE + 'timetable/list1039.html')
+    seen_l, seen_tt, trains = set(), set(), {}
+    def do_list(u):
+        if u in seen_l or len(seen_l) >= max_stations: return
+        seen_l.add(u)
         try:
             page = fetch(u); time.sleep(delay)
         except RuntimeError as e:
-            print('  ', e, flush=True); skipped += 1; continue
-        if n < show:
-            i = page.find('運行日'); print(f'--- JR East train {u}\n calendar: ' + re.sub(r'\s+', ' ', page[i:i + 1800]) + '\n---', flush=True)
-        r = runs_on(page, d)
-        if r is False: off += 1; continue
-        t = parse(page)
-        if not t or len(t['stops']) < 2: skipped += 1; print('  skip', u, file=sys.stderr); continue
-        t['id'] = 'E' + re.sub(r'\D', '', u.rsplit('/', 2)[-1])
-        t['cal'] = r
-        out.append(t)
-        if n % 25 == 0: print(f'  {n + 1}/{len(trains)} {t["name"]}{t["num"]} {t["stock"]} {len(t["stops"])} stops, runs {r}', flush=True)
-    print(f'JR East: {len(out)} trains run today, {off} not today, {skipped} unreadable', flush=True)
+            print('  ', e, flush=True); return
+        for tt in shinkansen_tts(u, page, suffix):
+            if tt in seen_tt: continue
+            seen_tt.add(tt)
+            try:
+                p2 = fetch(tt); time.sleep(delay)
+            except RuntimeError as e:
+                print('  ', e, flush=True); continue
+            new = 0
+            for h in re.findall(r'href="([^"]*/train/[^"]+\.html)"', p2):
+                h = urljoin(tt, h)
+                if h not in trains: trains[h] = None; new += 1
+            print(f'  {tt.rsplit("/", 1)[1]}: +{new} trains ({len(trains)} total)', flush=True)
+    for u in dict.fromkeys(lists): do_list(u)
+    out, skipped, off, done = [], 0, 0, set()
+    while True:
+        todo = [u for u in trains if u not in done]
+        if not todo: break
+        for u in todo:
+            done.add(u)
+            try:
+                page = fetch(u); time.sleep(delay)
+            except RuntimeError as e:
+                print('  ', e, flush=True); skipped += 1; continue
+            for h in re.findall(r'href="([^"]*timetable/list\d+\.html)"', page): do_list(urljoin(u, h))
+            if len(done) <= show:
+                i = page.find('運行日'); print(f'--- JR East train {u}\n calendar: ' + re.sub(r'\s+', ' ', page[i:i + 1800]) + '\n---', flush=True)
+            r = runs_on(page, d)
+            if r is False: off += 1; continue
+            t = parse(page)
+            if not t or len(t['stops']) < 2: skipped += 1; print('  skip', u, file=sys.stderr); continue
+            t['id'] = 'E' + re.sub(r'\D', '', u.rsplit('/', 2)[-2] + u.rsplit('/', 1)[-1])
+            t['cal'] = r
+            out.append(t)
+            if len(done) % 25 == 1: print(f'  {len(done)}/{len(trains)} {t["name"]}{t["num"]} {t["stock"]} {len(t["stops"])} stops, runs {r}', flush=True)
+    print(f'JR East: {len(seen_l)} stations, {len(seen_tt)} timetables, {len(out)} trains run today, {off} not today, {skipped} unreadable', flush=True)
     return out
 
 
