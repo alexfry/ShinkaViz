@@ -53,6 +53,19 @@ def fetch(url, tries=4):
     raise RuntimeError('failed: ' + url)
 
 
+def fetch_many(urls, workers=6, delay=0.3):
+    """Fetch pages a few at a time (each worker pauses between its requests). Returns [(url, page or None)] in order."""
+    from concurrent.futures import ThreadPoolExecutor
+    def one(u):
+        try:
+            p = fetch(u)
+        except RuntimeError as e:
+            print(e, file=sys.stderr); p = None
+        time.sleep(delay); return u, p
+    with ThreadPoolExecutor(workers) as ex:
+        return list(ex.map(one, urls))
+
+
 class Text(HTMLParser):
     """Visible text as lines; block-level tags and table cells start new lines."""
     BLOCK = {'p', 'div', 'li', 'tr', 'td', 'th', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'dt', 'dd', 'table', 'section', 'ul', 'ol', 'span'}
@@ -148,6 +161,7 @@ def main():
     ap.add_argument('--dump', default=None)
     ap.add_argument('--min', type=int, default=150, help='refuse to write fewer trains than this')
     ap.add_argument('--no-east', action='store_true', help="skip JR East's site")
+    ap.add_argument('--workers', type=int, default=6, help='pages fetched at once')
     ap.add_argument('--delay', type=float, default=0.7)
     ap.add_argument('--show', type=int, default=0, help='print the text of the first N train pages (for checking the parser)')
     a = ap.parse_args()
@@ -170,8 +184,10 @@ def main():
         for t in found: ids.setdefault(t, sp)
         print(f'{sp}: {len(set(found))} trains ({len(ids)} total)', flush=True)
     trains, bad = [], 0
-    for n, tid in enumerate(sorted(ids)):
-        page = fetch(f'{BASE}/train-timetable/{tid}?date={a.date}'); time.sleep(a.delay)
+    tids = sorted(ids)
+    pages = fetch_many([f'{BASE}/train-timetable/{tid}?date={a.date}' for tid in tids], a.workers)
+    for n, (tid, (_, page)) in enumerate(zip(tids, pages)):
+        if page is None: bad += 1; continue
         if a.dump and n < 6: open(os.path.join(a.dump, f'train-{tid}.html'), 'w').write(page)
         if n < a.show: print(f'--- train page {tid} ---\n' + '\n'.join([l for l in text_lines(page) if not re.fullmatch(r'\d{1,2}|[日月火水木金土]|\d{4}年\d{1,2}月', l)][:160]) + '\n---', flush=True)
         t = parse_train(page)
@@ -187,7 +203,7 @@ def main():
             import build_jreast
             have = {(t['type'], t['num']): t for t in trains}
             added = 0
-            for t in build_jreast.collect(a.date, a.delay, a.show):
+            for t in build_jreast.collect(a.date, a.workers, a.show):
                 t['stops'] = [s for s in t['stops'] if s[0] in NETWORK]
                 if len(t['stops']) < 2: continue
                 t['dir'] = 1 if t['num'] % 2 else -1

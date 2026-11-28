@@ -683,11 +683,13 @@ const VMAX=300/3.6,RA=1/(2*ACC)+1/(2*DEC);
 /* cruise speed that covers d metres in the scheduled T seconds (accelerate, cruise, brake); capped at line speed */
 function fitRun(d,T,vm=VMAX){const D=T*T-4*RA*d;if(!(T>0)||D<=0)return segRun(d,vm);const v=Math.min(vm,(T-Math.sqrt(D))/(2*RA));return v>=vm-1e-6?segRun(d,vm):{v,T:d/v+RA*v};}
 const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama','名古屋':'Nagoya','京都':'Kyoto','熊本':'Kumamoto','鹿児島中央':'Kagoshima-Chuo','新鳥栖':'Shin-Tosu','久留米':'Kurume','筑後船小屋':'Chikugo-Funagoya','新大牟田':'Shin-Omuta','新玉名':'Shin-Tamana','新八代':'Shin-Yatsushiro','博多南':'Hakata-Minami'};
+/* JR East's pages don't name the rolling stock; these are what each service runs today */
+const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6',tsubasa:'E8',toki:'E7',tanigawa:'E7',kagayaki:'E7',hakutaka:'E7',tsurugi:'E7',asama:'E7'};
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
   const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
-  const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock,dest:t.dest,
+  const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock||DEF_STOCK[type]||null,dest:t.dest,
    liv:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
