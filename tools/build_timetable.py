@@ -18,6 +18,8 @@ from html.parser import HTMLParser
 
 BASE = 'https://timetable.jr-odekake.net'
 # station timetable ids: <station><line 002 = Tokaido/Sanyo/Kyushu Shinkansen><direction 001/002>
+# whole-line tables (every train on the line that day): Tokaido-Sanyo-Kyushu down and up, Hokuriku down
+LINE_PAGES = ['1796', '2229', '2829']
 STATION_PAGES = ['2815002001', '2815002002',   # Shin-Osaka
                  '3449002001', '3449002002',   # Okayama
                  '3863002001', '3863002002',   # Hiroshima
@@ -31,7 +33,11 @@ OTHER = ['東京', '品川', '新横浜', '小田原', '熱海', '三島', '新�
 _cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lines.json'), encoding='utf-8'))['lines']
 NETWORK = sorted({st[0] for L in _cfg for st in L['stations']})
 ALL = sorted(set(SANYO + OTHER + NETWORK), key=len, reverse=True)   # longest first, so 新大阪 never matches as 大阪 etc.
-TYPES = {'のぞみ': 'nozomi', 'ひかり': 'hikari', 'こだま': 'kodama', 'みずほ': 'mizuho', 'さくら': 'sakura', 'つばめ': 'tsubame'}
+TYPES = {'のぞみ': 'nozomi', 'ひかり': 'hikari', 'こだま': 'kodama', 'みずほ': 'mizuho', 'さくら': 'sakura', 'つばめ': 'tsubame', 'かもめ': 'kamome',
+         'かがやき': 'kagayaki', 'はくたか': 'hakutaka', 'つるぎ': 'tsurugi', 'あさま': 'asama', 'はやぶさ': 'hayabusa', 'はやて': 'hayate',
+         'やまびこ': 'yamabiko', 'なすの': 'nasuno', 'こまち': 'komachi', 'つばさ': 'tsubasa', 'とき': 'toki', 'たにがわ': 'tanigawa'}
+NAMES = '|'.join(sorted(TYPES, key=len, reverse=True))
+SERIES = r'(N700S|N700A|N700|800|700|500|E2|E3|E5|E6|E7|E8|W7|H5)'
 UA = 'ShinkaViz timetable builder (+https://github.com/alexfry/ShinkaViz)'
 
 
@@ -87,15 +93,15 @@ def secs(h, m):
 def parse_train(page):
     L = text_lines(page)
     full = '\n'.join(L)
-    m = re.search(r'(のぞみ|ひかり|こだま|みずほ|さくら|つばめ)\s*(\d+)\s*号', full)
+    m = re.search(r'(' + NAMES + r')\s*(\d+)\s*号', full)
     if not m: return None
     name, num = m.group(1), int(m.group(2))
     # rolling stock: prefer "<series>系 ... <n>両" (the formation line); a bare "<series>系" can also be a site banner
     stock = cars = None
-    f = re.search(r'(N700S|N700A|N700|800|700|500)\s*系[^\n]{0,12}?(\d{1,2})\s*両', full)
+    f = re.search(SERIES + r'\s*系[^\n]{0,12}?(\d{1,2})\s*両', full)
     if f: stock, cars = f.group(1), int(f.group(2))
     else:
-        for s in re.finditer(r'(N700S|N700A|N700|800|700|500)\s*系', full):
+        for s in re.finditer(SERIES + r'\s*系', full):
             ctx = full[max(0, s.start() - 30):s.end() + 30]
             if not re.search(r'ラスト|last|LAST|特設|サイト', ctx): stock = s.group(1); break
         c = re.search(r'(\d{1,2})\s*両', full)
@@ -146,6 +152,15 @@ def main():
     a = ap.parse_args()
     if a.dump: os.makedirs(a.dump, exist_ok=True)
     ids = {}
+    for lp in LINE_PAGES:
+        try:
+            page = fetch(f'{BASE}/line-timetable/{lp}?date={a.date}'); time.sleep(a.delay)
+        except RuntimeError as e:
+            print(e, file=sys.stderr); continue
+        found = re.findall(r'train-timetable/(\d+)', page)
+        for t in found: ids.setdefault(t, 'L' + lp)
+        print(f'line {lp}: {len(set(found))} trains ({len(ids)} total)', flush=True)
+        if not found: print('  no train links; sample:', re.sub(r'\s+', ' ', page[page.find('列車番号'):][:1500]), flush=True)
     for sp in STATION_PAGES:
         url = f'{BASE}/station-timetable/{sp}?date={a.date}'
         page = fetch(url); time.sleep(a.delay)
