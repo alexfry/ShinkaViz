@@ -77,7 +77,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
     <span class="k">位置 Position</span><span class="v" id="km"></span></div></div>
 </div>
 <div id="ui">
-  <div class="grp" id="camGrp"><button class="ico" aria-label="Camera" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.6"/></svg><span class="cur"></span></button><div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="plat">Platform</button><button data-m="board">On board</button></div></div>
+  <div class="grp" id="camGrp"><button class="ico" aria-label="Camera" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.6"/></svg><span class="cur"></span></button><div class="seg" id="modes" role="group" aria-label="Camera"><button data-m="chase" class="on">Chase</button><button data-m="over">Overview</button><button data-m="cine">Cinematic</button><button data-m="tour">Tour</button><button data-m="plat">Platform</button><button data-m="board">On board</button></div></div>
   <span id="obUi" class="seg" hidden><button data-v="front" class="on">前面 Cab</button><button data-v="left">左 Left</button><button data-v="right">右 Right</button></span>
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
@@ -1099,10 +1099,45 @@ const SHOTS={
 function nextShot(now){if(SHOTS.arrive.ok()&&cine.last!=='arrive'){cine.shot=cine.last='arrive';cine.side=1;cine.t0=now;cine.ar=null;SHOTS.arrive.start();clearP=true;$('#shot').textContent=`${SHOTS.arrive.ja} ${SHOTS.arrive.en}`;return;}
  const pool=fs.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal','catch','leave','catch','leave'];
  let c=pool.filter(k=>k!==cine.last&&SHOTS[k].ok());if(!c.length)c=['heli'];
- cine.shot=c.includes('portal')&&Math.random()<.5?'portal':c.includes('station')?'station':c[Math.random()*c.length|0];
+ startShot(c.includes('portal')&&Math.random()<.5?'portal':c.includes('station')?'station':c[Math.random()*c.length|0],now);}
+function startShot(k,now){cine.shot=k;
  cine.last=cine.shot;cine.side=Math.random()<.75?1:-1;cine.yaw=Math.random()*6.283;cine.t0=now;cine.ar=null;cine.end=Math.random()<.7?REL.head()+30:REL.tail()-30;SHOTS[cine.shot].start();clearP=true;
  $('#shot').textContent=`${SHOTS[cine.shot].ja} ${SHOTS[cine.shot].en}`;}
-function cineCam(now){if(!cine.shot||(cine.shot!=='arrive'&&cine.shot!=='station'&&SHOTS.arrive.ok()&&cine.last!=='arrive'))nextShot(now);if(SHOTS[cine.shot].upd((now-cine.t0)/1000)){nextShot(now);SHOTS[cine.shot].upd(0);}
+
+/* Tour: cinematic shots that hop between trains wherever something is happening (an arrival or departure, a tunnel portal
+   coming up, flat-out running, passing a landmark), preferring trains near the current one so the camera's flight between
+   them stays short. Between trains the camera flies an arc from where it is to the next shot's opening position. */
+const TOUR={on:false,n:0,max:2,fly:null,recent:[],why:''};
+const LANDMARK_JA=['東京','新横浜','名古屋','京都','新大阪','広島','博多','新富士','浜松','新下関','仙台','盛岡','新青森','奥津軽いまべつ','新函館北斗','大宮','高崎','長野','金沢','新潟','鹿児島中央','長崎'];
+const LANDMARK_EN={'新富士':'Mt Fuji','浜松':'Lake Hamana','新下関':'the Kanmon Strait','奥津軽いまべつ':'the Seikan Tunnel'};
+function tourEvent(tr,st){const v=st.v*3.6,ne=tr.ev[st.i+1],sp=Math.max(speed,1),k=tr.ks?null:null;
+ if(st.stop>=0){const e=tr.ev[st.i],wait=(e.dep-simT)/sp;if(wait>6&&wait<45)return {sc:2.6,shot:'station',why:['発車','Departing',stations[st.stop]]};return null;}
+ if(ne&&tr.stopSet.has(ne.k)){const eta=(ne.arr-simT)/sp;if(eta>6&&eta<40)return {sc:3,shot:'arrive',why:['到着','Arriving',stations[ne.k]]};}
+ atT(tr,st.s,0,Q);for(const ja of LANDMARK_JA){const k=KJ.get(ja);if(k===undefined)continue;const p=stations[k];if(Math.hypot(p.x-Q[0],p.z-Q[2])<6000&&st.stop<0)return {sc:LANDMARK_EN[ja]?2.2:1.4,shot:'heli',why:['名所','Passing',LANDMARK_EN[ja]?{name:LANDMARK_EN[ja],ja}:p]};}
+ const h=st.s+tr.dir*tr.len/2;for(let j=8;j<=30;j++){const u=h+j*DS;if(u>tr.R.U)break;if(tunT(tr,u)>.5&&tunT(tr,u-DS)<.5)return {sc:1.6,shot:'portal',why:['トンネル','Tunnel ahead',null]};}
+ if(v>255)return {sc:1.2+(v-255)/60,shot:['flyby','catch','leave'][Math.random()*3|0],why:['高速','Flat out',null]};
+ return null;}
+function tourPick(){const here=[FP0.cx,FP0.cz],c=[];
+ for(const tr of trains){if(tr===FT||!runningAt(tr,simT)||TOUR.recent.includes(tr))continue;const st=stateAt(tr,simT,{});if(!st)continue;const ev=tourEvent(tr,st);if(!ev)continue;
+  atT(tr,st.s,0,Q);const d=Math.hypot(Q[0]-here[0],Q[2]-here[1]);c.push([ev.sc*Math.exp(-d/120000)*(.6+Math.random()*.8),tr,ev,d]);}
+ c.sort((a,b)=>b[0]-a[0]);return c[0]||null;}
+function tourHop(now){const pk=tourPick();if(!pk){TOUR.n=0;nextShot(now);return;}
+ const [,tr,ev,d]=pk,p0=cam.position.clone(),t0=T.clone(),f0=cam.fov;TOUR.recent.push(FT);if(TOUR.recent.length>6)TOUR.recent.shift();
+ setFocus(tr);mode='cine';TOUR.n=0;
+ if(ev.shot==='arrive'&&SHOTS.arrive.ok())startShot('arrive',now);else if(SHOTS[ev.shot]&&SHOTS[ev.shot].ok())startShot(ev.shot,now);else nextShot(now);
+ const w=ev.why,nm=tName(tr);TOUR.why=`${w[0]} ${w[1]}${w[2]?' · '+w[2].name:''} — ${nm[1]}`;
+ TOUR.fly={p0,t0,f0,t:now,dur:Math.min(9,Math.max(3,2.5+d/40000))*1000};}
+function tourCam(now){
+ if(TOUR.fly){const F=TOUR.fly,u=Math.min(1,(now-F.t)/F.dur),e=u*u*(3-2*u);
+  cine.t0=now;SHOTS[cine.shot].upd(0);const p1=cam.position.clone(),t1=T.clone(),f1=cam.fov,dist=F.p0.distanceTo(p1);
+  cam.position.lerpVectors(F.p0,p1,e);cam.position.y+=Math.min(dist*.3,25000)*Math.sin(Math.PI*u);T.lerpVectors(F.t0,t1,e);
+  cam.fov=f1+(F.f0-f1)*(1-e)*(1-e)+20*Math.sin(Math.PI*u)*Math.min(1,dist/20000);
+  $('#shot').textContent=TOUR.why;if(u>=1){TOUR.fly=null;cine.t0=now;}
+  cam.near=Math.max(.5,cam.position.distanceTo(T)*.02);cam.far=300000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;return;}
+ const done=!cine.shot||SHOTS[cine.shot].upd((now-cine.t0)/1000);
+ if(done){TOUR.n++;if(TOUR.n>=TOUR.max){tourHop(now);if(TOUR.fly)return tourCam(now);}else{nextShot(now);const sh=SHOTS[cine.shot],nm=tName(FT);$('#shot').textContent=`${sh.ja} ${sh.en} — ${nm[1]}`;}SHOTS[cine.shot].upd(0);}
+ cam.near=Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
+function cineCam(now){if(TOUR.on)return tourCam(now);if(!cine.shot||(cine.shot!=='arrive'&&cine.shot!=='station'&&SHOTS.arrive.ok()&&cine.last!=='arrive'))nextShot(now);if(SHOTS[cine.shot].upd((now-cine.t0)/1000)){nextShot(now);SHOTS[cine.shot].upd(0);}
  cam.near=Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
 /* platform: stand on a station platform; drag to look around, pinch to zoom */
 const PLAT_CAM={k:3,side:1,yaw:0,pitch:0,fov:55};
@@ -1138,7 +1173,8 @@ canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)re
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 const up=e=>{ptrs.delete(e.pointerId);pinch=0;};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='board'){OB.fov=Math.min(80,Math.max(20,OB.fov*Math.exp(e.deltaY*.0012)));return;}if(mode==='plat'){PLAT_CAM.fov=Math.min(75,Math.max(15,PLAT_CAM.fov*Math.exp(e.deltaY*.0012)));return;}if(mode!=='orbit')return;anim=null;zoomAt(e.clientX,e.clientY,Math.exp(e.deltaY*.0012));},{passive:false});
-function setMode(m){if(m==='board'){mode='board';anim=null;$('#shot').textContent='';setOB(OB.view);}
+function setMode(m){TOUR.on=m==='tour';if(m==='tour'){mode='cine';TOUR.n=TOUR.max;TOUR.fly=null;cine.shot=null;anim=null;clearP=true;return;}
+ if(m==='board'){mode='board';anim=null;$('#shot').textContent='';setOB(OB.view);}
  else if(m==='plat'){if(mode!=='plat'){const ne=FT.ev[Math.min(fs.i+1,FT.ev.length-1)];setPlat(fs.stop>=0?fs.stop:ne.k,1);}mode='plat';anim=null;$('#shot').textContent='';}
  else if(m==='cine'){mode='cine';cine.shot=null;anim=null;}
  else{const b=PRESET[m]();if(mode==='orbit')glideFrom=T.clone();else OFF.x=OFF.y=OFF.z=0;PAN.x=PAN.z=0;if(mode==='cine'){mode='orbit';Object.assign(ORB,PRESET.chase());}mode='orbit';flyTo(b,m==='over'?3200:2800);$('#shot').textContent='';}clearP=true;}
@@ -1177,7 +1213,7 @@ function updBoard(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,rows=[];
   tb.appendChild(tr_);}
  if(!rows.length){const tr_=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;td.className='k';td.textContent='No trains in the next 90 minutes';tr_.appendChild(td);tb.appendChild(tr_);}}
 let modeShown='',legendShown=null;
-function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode==='board'?'board':ORB.dist<30000?'chase':'over';if(cur!==modeShown){modeShown=cur;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===cur);const pl=cur==='plat';$('#obUi').hidden=cur!=='board';$('#platUi').hidden=!pl;$('#trainWrap').hidden=pl;$('#board').hidden=!pl;$('#hero').hidden=pl;}
+function updModeUi(){const cur=mode==='cine'?(TOUR.on?'tour':'cine'):mode==='plat'?'plat':mode==='board'?'board':ORB.dist<30000?'chase':'over';if(cur!==modeShown){modeShown=cur;for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.m===cur);const pl=cur==='plat';$('#obUi').hidden=cur!=='board';$('#platUi').hidden=!pl;$('#trainWrap').hidden=pl;$('#board').hidden=!pl;$('#hero').hidden=pl;}
  if(mode==='plat'&&performance.now()-boardT>500){boardT=performance.now();updBoard();}
  if(mode!=='plat'&&performance.now()-selT>2000){selT=performance.now();updTrainSel();}
  const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
