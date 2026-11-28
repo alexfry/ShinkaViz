@@ -874,7 +874,10 @@ function placeHero(tr,st,cars,dt){const head=st.s+tr.dir*tr.len/2;let acc=0;
   if(c===0)for(const l of HL)light(P,l[0],l[1],l[2],[6,6,5.5],6);if(c===7)for(const l of HL)light(P,-l[0],l[1],l[2],[5,.25,.12],5);
   /* each car dims on its own as it passes a portal, eased over a few frames */
   const u=g.userData,tg=(1-.78*P.tun)*(mode==='board'&&FT===tr&&OB.view==='front'?.4:1);u.k+=(tg-u.k)*Math.min(1,dt*8);u.lm.uniforms.uMul.value=u.k;u.hm.uniforms.uMul.value=u.k;}}
-function dot(tr,st){if(np>=MAXP)return;atT(tr,st.s,latFor(tr,st.s),A);const i=np*3,c=tr.hero?[1.1,1.3,1.8]:mul(tr.sv.col,.6);PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=c[0];PCL[i+1]=c[1];PCL[i+2]=c[2];PS[np]=tr.hero?7:5;PK[np]=1;np++;}
+/* far away, each train is a bright dot: a coloured halo with a near-white core (fades in from ~6 km out) */
+function dot(tr,st){if(np+2>MAXP)return;atT(tr,st.s,latFor(tr,st.s),A);const c=tr.hero?[1.1,1.3,1.8]:tr.sv.col,hv=tr===HOV.tr?1.8:1;
+ const put=(col,sz)=>{const i=np*3;PP[i]=A[0];PP[i+1]=A[1]+3;PP[i+2]=A[2];PCL[i]=col[0];PCL[i+1]=col[1];PCL[i+2]=col[2];PS[np]=sz;PK[np]=1;np++;};
+ put(mul(c,.4*hv),(tr.hero?14:12)*hv);put(c.map(v=>(v*.45+.75)*hv),(tr.hero?6:4.5)*hv);}
 
 /* the followed train's own rails light up from its outermost wheels, forward (white) and back (red), fading over about a car length */
 const RG_AH=26,RG_BH=26,RG_ST=1,RGN=(RG_AH+RG_BH)/RG_ST*2+8,rgPos=new Float32Array(RGN*6),rgCol=new Float32Array(RGN*6),rgG=new THREE.BufferGeometry();
@@ -1116,6 +1119,19 @@ const placed=[];
 let FRAME=0;const MK=[],mkBox=$('#labels');
 const css=c=>`rgb(${c.map(v=>Math.round(Math.min(1,v/1.7)*255)).join(',')})`;
 function mkEl(i){while(MK.length<=i){const d=document.createElement('div');d.className='tm';d.addEventListener('click',e=>{e.stopPropagation();if(d._tr)setFocus(d._tr);});mkBox.appendChild(d);MK.push(d);}return MK[i];}
+/* hover (mouse only): the train drawn nearest the pointer gets a label with its name, destination, stock and speed */
+const HOV={x:-1,y:-1,tr:null,el:null};
+function trainNear(px,py,r){const W=window.innerWidth,H=window.innerHeight;let best=null,bd=r*r;
+ for(const tr of trains){if(tr._f!==FRAME)continue;const step=Math.max(12,tr.len/10);for(let u=tr._s-tr.len/2;u<=tr._s+tr.len/2+1;u+=step){atT(tr,u,latFor(tr,u),Q);v3.set(Q[0],Q[1]+3,Q[2]).project(cam);if(v3.z>1)continue;
+   const dx=(v3.x*.5+.5)*W-px,dy=(-v3.y*.5+.5)*H-py,d=dx*dx+dy*dy;if(d<bd){bd=d;best=tr;}}}return best;}
+function updHover(){if(!HOV.el){HOV.el=document.createElement('div');HOV.el.className='tm hov';HOV.el.style.pointerEvents='none';HOV.el.style.display='none';document.body.appendChild(HOV.el);}
+ const tr=HOV.x<0||mode==='board'?null:trainNear(HOV.x,HOV.y,18);HOV.tr=tr;canvas.style.cursor=tr?'pointer':'';
+ if(!tr){HOV.el.style.display='none';return;}const st=stateAt(tr,simT,SX),nm=tName(tr),de=tDest(tr),sk=tStock(tr),v=st?Math.round(st.v*3.6):0;
+ HOV.el.innerHTML='';const i=document.createElement('i');i.style.background=tr.hero?'#cfe6ff':css(tr.sv.col);const b=document.createElement('b');b.textContent=nm[0];
+ const sp=document.createElement('span');sp.textContent=` ${nm[1]} → ${de.name}`;const l2=document.createElement('div');l2.style.opacity='.75';l2.textContent=`${sk[1]} · ${v} km/h${st&&st.stop>=0?' · '+stations[st.stop].name:''}`;
+ HOV.el.append(i,b,sp,l2);HOV.el.style.display='';HOV.el.style.transform=`translate(${HOV.x+14}px,${HOV.y+14}px)`;}
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&!e.buttons){HOV.x=e.clientX;HOV.y=e.clientY;}else HOV.x=-1;});
+canvas.addEventListener('pointerleave',()=>{HOV.x=-1;});
 function updMarkers(){const W=window.innerWidth,H=window.innerHeight,list=[];
  if(ovf<.3)for(const tr of trains){if(tr._f!==FRAME||tr===FT)continue;atT(tr,tr._s+tr.len/2-14,latFor(tr,tr._s),Q);v3.set(Q[0],Q[1]+6,Q[2]);const d=v3.distanceTo(cam.position);if(d>6000)continue;
   v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1||Math.abs(v3.y)>1)continue;list.push([d,tr,(v3.x*.5+.5)*W,(-v3.y*.5+.5)*H]);}
@@ -1129,7 +1145,7 @@ function pickAt(px,py){const W=window.innerWidth,H=window.innerHeight;let best=n
  for(const tr of trains){if(tr._f!==FRAME)continue;const step=Math.max(12,tr.len/10);for(let u=tr._s-tr.len/2;u<=tr._s+tr.len/2+1;u+=step){atT(tr,u,latFor(tr,u),Q);v3.set(Q[0],Q[1]+2,Q[2]).project(cam);if(v3.z>1)continue;
    const dx=(v3.x*.5+.5)*W-px,dy=(-v3.y*.5+.5)*H-py,d=dx*dx+dy*dy;if(d<bd){bd=d;best=tr;}}}
  if(best&&best!==FT)setFocus(best);return !!best;}
-function updLabels(){updMarkers();const W=window.innerWidth,H=window.innerHeight,far=ovf>.3,D=ORB.dist;placed.length=0;
+function updLabels(){updMarkers();updHover();const W=window.innerWidth,H=window.innerHeight,far=ovf>.3,D=ORB.dist;placed.length=0;
  for(const k of ORDER){const o=trk(PC[k]);v3.set(o.x,o.y+(far?0:40),o.z);const dist=v3.distanceTo(cam.position),t=TIER[k];
   let show=far?(t<=1||(t===2&&D<900000)||D<350000):dist<20000;v3.project(cam);if(v3.z>1||Math.abs(v3.x)>1.1||Math.abs(v3.y)>1.1)show=false;
   const x=(v3.x*.5+.5)*W,y=(-v3.y*.5+.5)*H,el=LB[k],hw=t===0?70:46,hh=t===0?34:26;
