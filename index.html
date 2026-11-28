@@ -592,6 +592,44 @@ function specN700(liv){return {LN:10.7,KH:57,sub:4,NU:4,skirt:.21,waist:.41,bog:
   poly([[-.3,2.47],[-.1,2.62],[.06,2.8]].map(([z,h])=>{const d=dFor(z,h,2.2,8);return d===null?null:onS(d,z,.07);}),mul(HB,.8));
   {let p=null;for(let k=0;k<=12;k++){const q=onS(2.2*k/12,0,.02);if(p)S.add(p,q,mul(HB,1.1));p=q;}}}};}
 const M700N=buildModel(specN700('noz')),M700K=buildModel(specN700('kyu'));
+/* E5 series (Hayabusa, Yamabiko, Nasuno; the H5 on Hokkaido trains is the same shape). Fitted to a JR East design drawing of the
+   end car (26.25 m: 15 m nose, 5.25 m tip to bogie, 17.5 m bogie centres, 3.35 x 3.65 m section; measured at 13.69 mm/px).
+   Top line from the side view with the cab canopy split out; half-widths from the plan, including the duckbill and its flare. */
+const E5SWEEP=[[1.9,.5],[2.35,.66],[2.92,1.15],[3.5,1.44],[4.2,1.64],[5.36,1.81],[7,2.05],[9,2.37],[11,2.72]];
+const SPECE5={LN:15,MR:44,skirt:.2,waist:.38,bog:[5.25,22.75],cut:[1.95,.22],bump:10,
+ NU:d=>d<3?2.2+d/3:3.2,nl:d=>d<3?2.5+2.5*d/3:5,
+ fair:[[[-1.95,.2],[-1.95,.86],[1.95,.86],[1.95,.2]]],
+ TAB_W:[[0,.2],[.04,.24],[.08,.38],[.12,.46],[.16,.54],[.25,.66],[.33,.76],[.41,.85],[.49,.92],[.57,.97],[.66,1.01],[.74,1.05],[.82,1.08],[1.16,1.16],[1.51,1.22],[1.85,1.24],[2.19,1.26],[2.53,1.27],[2.87,1.39],[3.22,1.53],[3.56,1.61],[3.9,1.65],[4.6,1.675],[15,1.675]],
+ TAB_T:[[0,1.25],[.05,1.33],[.13,1.44],[.25,1.56],[.38,1.66],[.5,1.74],[.62,1.79],[.96,1.875],[1.31,1.93],[1.99,1.984],[2.68,2.039],[3.36,2.08],[4.04,2.135],[5.07,2.217],[6,2.3],[7,2.42],[8,2.58],[9,2.77],[10,2.98],[10.55,3.093],[11.23,3.203],[11.91,3.326],[12.6,3.435],[13.28,3.545],[13.97,3.613],[14.65,3.65],[15,3.65]],
+ TAB_C:[[5.07,0],[5.41,.03],[5.75,.11],[6.1,.21],[6.44,.3],[6.78,.37],[7.12,.45],[7.47,.49],[7.81,.5],[8.15,.48],[8.49,.45],[8.83,.4],[9.18,.32],[9.52,.24],[9.86,.16],[10.2,.06],[10.55,0]],
+ TAB_B:[[0,1.0],[.1,.85],[.25,.7],[.4,.6],[.6,.5],[.85,.38],[1.2,.3],[2,.22],[3,.2],[15,.2]],
+ decorate({S,P,len,nf,nr,xAt,dOf,zOn,lon,along,rect,pt,pf}){
+  /* livery: Tokiwa green above, white below, the pink Hayate stripe between (above the windows; on the nose it sweeps down
+     towards the chin). Lines are tinted to match. */
+  const GR=[.15,1.15,.55],PK=[1.7,.45,1.0],WH=mul(HB,1.15);
+  along(.95,mul(GR,1.4));along(Math.PI-.95,mul(GR,1.4));            /* roof shoulders */
+  lon(2.79,mul(GR,1.6),11);lon(2.74,PK,11);
+  lon(.62,mul(HB,.45),3.5);                                           /* lower body */
+  const end=nf||nr,poly=(pts,col,closed)=>{let p=null,f=null;for(const q of pts){if(!q){p=null;continue;}if(p)S.add(p,q,col);else f=q;p=q;}if(closed&&p&&f)S.add(p,f,col);};
+  const side=(T,col,dz=0)=>{for(const sd of[-1,1])poly(T.map(([d,h])=>{const x=xAt(d),z=zOn(x,h);return z===null?null:[x,h,sd*(z-.01+dz)];}),col);};
+  /* doors and windows (heights 1.3-3.2 m and 2.08-2.63 m on the drawing; 1.04 m window pitch) */
+  const doors=end?[[12.7,.29],[13.85,.35],[22.55,.35]].map(([d,w])=>[xAt(d),w]):[[-len/2+1.6,.35],[len/2-1.6,.35]];
+  for(const [x,w] of doors)rect(x-w,x+w,1.3,3.2,mul(HB,1.2));
+  if(end){for(const d of[16.02,17.05,18.1,19.14,20.18,21.22]){const x=xAt(d);rect(x-.27,x+.27,2.08,2.63,mul(HB,.9));}}
+  else{const x0=-len/2+3.0,x1=len/2-3.0;for(let x=x0;x<=x1+1e-6;x+=1.04)rect(x-.27,x+.27,2.08,2.63,mul(HB,.9));}
+  if(!end)return;
+  side(E5SWEEP,PK);side(E5SWEEP.map(([d,h])=>[d,h+.06]),mul(GR,1.6));
+  /* cab canopy: its base outline (5.05-10.4 m, half-width 0.9 m from the plan) and the glazing (5.6-7.9 m, half-width 0.58 m) */
+  const loop=(d0,d1,hw,peak,col,g)=>{for(const sd of[-1,1]){let p=null;for(let k=0;k<=32;k++){const u=k/32,f=u<peak?Math.sin(Math.PI/2*u/peak):Math.cos(Math.PI/2*(u-peak)/(1-peak)),q=pt(d0+(d1-d0)*u,sd*hw*Math.pow(Math.max(0,f),.5),g);if(p)S.add(p,q,col);p=q;}}};
+  loop(5.05,10.4,.9,.38,mul(GR,1.7),.04);
+  {const G=[[5.6,0],[5.75,.3],[6.1,.48],[6.7,.57],[7.4,.58],[7.9,.5],[7.9,0]],o=[];for(const [d,z] of G)o.push(pt(d,z,.06));for(const [d,z] of G.slice().reverse())o.push(pt(d,-z,.06));poly(o,mul(HC,2.5),true);
+   poly([[7.0,0],[7.0,.57]].map(([d,z])=>pt(d,z,.07)),mul(HC,1.4));poly([[7.0,0],[7.0,-.57]].map(([d,z])=>pt(d,z,.07)),mul(HC,1.4));}
+  {let p=null;for(let k=0;k<=16;k++){const q=pt(5.05*k/16,0,.03);if(p)S.add(p,q,mul(GR,1.5));p=q;}}
+  /* front view: the nose tip and the headlight clusters either side of it */
+  {const o=[];for(let k=0;k<64;k++){const t=k/64*Math.PI*2;o.push(pf(.99*Math.cos(t),1.13+.55*Math.sin(t),.03));}poly(o,WH,true);}
+  for(const sd of[-1,1]){const o=[];for(let k=0;k<32;k++){const t=k/32*Math.PI*2;o.push(pf(sd*.58+.24*Math.cos(t),.92+.1*Math.sin(t),.04));}poly(o,mul(HC,2.2),true);}}};
+const ME5=buildModel(SPECE5);
+
 const occMat=new THREE.MeshBasicMaterial({color:0,polygonOffset:true,polygonOffsetFactor:2,polygonOffsetUnits:4});
 const HCUT={value:0};/* on board, the camera is inside a car: drop silhouette shells within this distance */
 const hullMat=new THREE.ShaderMaterial({uniforms:{uPix:{value:.001},uCol:{value:new THREE.Vector3(.55,.75,1).multiplyScalar(2.2)},uScale:U.uScale,uMul:{value:1},uCut:HCUT},
@@ -628,26 +666,31 @@ void main(){vec4 mv=modelViewMatrix*(mat4(m0,m1,m2,m3)*vec4(position,1.));gl_Pos
 const hullInstMat=new THREE.ShaderMaterial({uniforms:{uPix:hullMat.uniforms.uPix,uCol:{value:new THREE.Vector3(.6,.82,1).multiplyScalar(1.9)},uScale:U.uScale,uCut:HCUT},
  vertexShader:`attribute float ik;uniform float uPix;varying float vK,vD;void main(){vec4 mv=modelViewMatrix*(instanceMatrix*vec4(position,1.));vD=length(mv.xyz);vec3 n=normalize(normalMatrix*(mat3(instanceMatrix)*normal));mv.xyz+=n*uPix*max(-mv.z,.1);gl_Position=projectionMatrix*mv;vK=ik;}`,
  fragmentShader:`uniform vec3 uCol;uniform float uScale,uCut;varying float vK,vD;void main(){if(vD<uCut)discard;gl_FragColor=vec4(uCol*uScale*vK,1.);}`,side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
-const NMAX=160,NT={lines:{noz:{},kyu:{}},occ:{},hull:{}},CARGS={front:[27,true,false],mid:[25,false,false],rear:[27,false,true]},DYN=THREE.DynamicDrawUsage;
-for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=M700N.carGeo(L,nf,nr);
- const o=new THREE.InstancedMesh(g,occMat,NMAX);o.instanceMatrix.setUsage(DYN);o.count=0;o.frustumCulled=false;o.layers.set(1);trainRoot.add(o);NT.occ[t]={m:o,n:0};
+/* model families: shared shape (occluders, outline hulls) and per-livery line templates; lamp = headlight [x from car centre, height, z] */
+const FAMS={n7:{M:M700N,end:27,livs:{noz:M700N,kyu:M700K},lamp:[27/2-1.1,1.42,1.08],ax:6.1,cab:[5.7,2.72,-.35]},
+ e5:{M:ME5,end:26.25,livs:{e5:ME5},lamp:[26.25/2-.45,.92,.58],ax:5.25,cab:[7.6,2.95,-.3]}};
+const LIVFAM={};for(const f in FAMS)for(const l in FAMS[f].livs)LIVFAM[l]=f;
+const NMAX=160,NT={lines:{},occ:{},hull:{}},DYN=THREE.DynamicDrawUsage;
+for(const fam in FAMS){const F=FAMS[fam],CARGS={front:[F.end,true,false],mid:[25,false,false],rear:[F.end,false,true]};NT.occ[fam]={};NT.hull[fam]={};for(const l in F.livs)NT.lines[l]={};
+for(const [t,[L,nf,nr]] of Object.entries(CARGS)){const g=F.M.carGeo(L,nf,nr);
+ const o=new THREE.InstancedMesh(g,occMat,NMAX);o.instanceMatrix.setUsage(DYN);o.count=0;o.frustumCulled=false;o.layers.set(1);trainRoot.add(o);NT.occ[fam][t]={m:o,n:0};
  const hg=g.clone(),hk=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);hg.setAttribute('ik',hk);
- const h=new THREE.InstancedMesh(hg,hullInstMat,NMAX);h.instanceMatrix.setUsage(DYN);h.count=0;h.frustumCulled=false;h.layers.set(1);trainRoot.add(h);NT.hull[t]={m:h,n:0,k:hk};
- for(const [liv,M] of[['noz',M700N],['kyu',M700K]]){const S=M.carLines(L,nf,nr,null),ig=new THREE.InstancedBufferGeometry(),at={};
+ const h=new THREE.InstancedMesh(hg,hullInstMat,NMAX);h.instanceMatrix.setUsage(DYN);h.count=0;h.frustumCulled=false;h.layers.set(1);trainRoot.add(h);NT.hull[fam][t]={m:h,n:0,k:hk};
+ for(const [liv,M] of Object.entries(F.livs)){const S=M.carLines(L,nf,nr,null),ig=new THREE.InstancedBufferGeometry(),at={};
   ig.setAttribute('position',new THREE.Float32BufferAttribute(S.p,3));ig.setAttribute('col',new THREE.Float32BufferAttribute(S.c,3));
   for(const k of['m0','m1','m2','m3']){at[k]=new THREE.InstancedBufferAttribute(new Float32Array(NMAX*4),4).setUsage(DYN);ig.setAttribute(k,at[k]);}
   at.ik=new THREE.InstancedBufferAttribute(new Float32Array(NMAX),1).setUsage(DYN);ig.setAttribute('ik',at.ik);ig.instanceCount=0;
-  const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}
+  const l=new THREE.LineSegments(ig,instLineMat);l.frustumCulled=false;l.layers.set(1);trainRoot.add(l);NT.lines[liv][t]={g:ig,at,n:0};}}}
 const N7X=27/2-1.1,N7L=[1.42,1.08];
 const DET2=3500*3500;let detailOK=true;
-function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',Lt=NT.lines[tr.liv||(tr.type==='nozomi'?'noz':'kyu')][t],O=NT.occ[t],H=NT.hull[t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
+function addDetailed(tr,c,n,P,k){const t=c===0?'front':c===n-1?'rear':'mid',lv=tr.liv||(tr.type==='nozomi'?'noz':'kyu'),fm=LIVFAM[lv],Lt=NT.lines[lv][t],O=NT.occ[fm][t],H=NT.hull[fm][t];if(Lt.n>=NMAX||O.n>=NMAX)return false;
  const rx=P.cx-ORG.x,ry=P.cy-ORG.y,rz=P.cz-ORG.z,i=Lt.n++,j=i*4,a=Lt.at;
  a.m0.array[j]=P.fx;a.m0.array[j+1]=P.fy;a.m0.array[j+2]=P.fz;a.m0.array[j+3]=0;a.m1.array[j]=P.ux;a.m1.array[j+1]=P.uy;a.m1.array[j+2]=P.uz;a.m1.array[j+3]=0;
  a.m2.array[j]=P.sx;a.m2.array[j+1]=P.sy;a.m2.array[j+2]=P.sz;a.m2.array[j+3]=0;a.m3.array[j]=rx;a.m3.array[j+1]=ry;a.m3.array[j+2]=rz;a.m3.array[j+3]=1;a.ik.array[i]=k;
  M4.set(P.fx,P.ux,P.sx,rx,P.fy,P.uy,P.sy,ry,P.fz,P.uz,P.sz,rz,0,0,0,1);O.m.setMatrixAt(O.n++,M4);H.m.setMatrixAt(H.n,M4);H.k.array[H.n]=k;H.n++;return true;}
-function resetDetailed(){trainRoot.position.copy(ORG);for(const liv of['noz','kyu'])for(const t in NT.lines[liv])NT.lines[liv][t].n=0;for(const t in NT.occ){NT.occ[t].n=0;NT.hull[t].n=0;}}
-function flushDetailed(){for(const liv of['noz','kyu'])for(const t in NT.lines[liv]){const L=NT.lines[liv][t];L.g.instanceCount=L.n;for(const k in L.at)L.at[k].needsUpdate=true;}
- for(const t in NT.occ){const O=NT.occ[t],H=NT.hull[t];O.m.count=O.n;O.m.instanceMatrix.needsUpdate=true;H.m.count=H.n;H.m.instanceMatrix.needsUpdate=true;H.k.needsUpdate=true;}}
+function resetDetailed(){trainRoot.position.copy(ORG);for(const liv in NT.lines)for(const t in NT.lines[liv])NT.lines[liv][t].n=0;for(const f in NT.occ)for(const t in NT.occ[f]){NT.occ[f][t].n=0;NT.hull[f][t].n=0;}}
+function flushDetailed(){for(const liv in NT.lines)for(const t in NT.lines[liv]){const L=NT.lines[liv][t];L.g.instanceCount=L.n;for(const k in L.at)L.at[k].needsUpdate=true;}
+ for(const f in NT.occ)for(const t in NT.occ[f]){const O=NT.occ[f][t],H=NT.hull[f][t];O.m.count=O.n;O.m.instanceMatrix.needsUpdate=true;H.m.count=H.n;H.m.instanceMatrix.needsUpdate=true;H.k.needsUpdate=true;}}
 
 /* ---------- sample timetable + motion model ---------- */
 const VK=285/3.6,VF=300/3.6,ACC=2.6/3.6,DEC=2.8/3.6;
@@ -687,10 +730,11 @@ const DEST_EN={'東京':'Tokyo','品川':'Shinagawa','新横浜':'Shin-Yokohama'
 const DEF_STOCK={hayabusa:'E5',hayate:'E5',yamabiko:'E5',nasuno:'E5',komachi:'E6',tsubasa:'E8',toki:'E7',tanigawa:'E7',kagayaki:'E7',hakutaka:'E7',tsurugi:'E7',asama:'E7'};
 function ttTrains(){const out=[];
  for(const t of TT.trains){const st=t.stops.filter(x=>KJ.has(x[0]));if(st.length<2)continue;
-  const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?27:25);
+  const type=SV[t.type]?t.type:'kodama',sv=SV[type],kyu=['mizuho','sakura','tsubame'].includes(type),cars=Math.max(4,Math.min(16,t.cars||(/^N700/.test(t.stock||'')&&!kyu?16:sv.cars))),cl=[];
+  const stk=t.stock||DEF_STOCK[type]||null,fam=stk==='E5'||stk==='H5'?'e5':'n7',endL=FAMS[fam].end;for(let i=0;i<cars;i++)cl.push(i===0||i===cars-1?endL:25);
   const ks=st.map(x=>KJ.get(x[0])),R=makeRoute(ks),is500=t.stock==='500'&&cars===8;if(!R)continue;
   const tr={type,dir:1,down:t.dir||1,R,sv,ks,stopSet:new Set(ks),cl,len:cl.reduce((a,b)=>a+b,0)+.6*(cars-1),hero:is500,v:sv.v,num:t.num,stock:t.stock||DEF_STOCK[type]||null,dest:t.dest,
-   liv:cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
+   fam,liv:fam==='e5'?'e5':cars>=16?'noz':'kyu',ev:[],couple:t.couple||null,name:t.name};
   st.forEach((x,j)=>{const k=ks[j];let arr=x[1],dep=x[2];if(dep==null)dep=arr;if(arr==null)arr=dep-240;tr.ev.push({k,s:R.uK.get(k),arr:Math.min(arr,dep),dep});});
   for(let j=0;j<tr.ev.length-1;j++){const e=tr.ev[j],n=tr.ev[j+1];e.d=Math.abs(n.s-e.s);e.g=fitRun(e.d,n.arr-e.dep,(sv.vm||300)/3.6);}
   const L=tr.ev[tr.ev.length-1];L.dep=L.arr;tr.evByK=new Map(tr.ev.map(e=>[e.k,e]));out.push(tr);}
@@ -747,7 +791,7 @@ const PQ={},HP0={fx:1,fy:0,fz:0,ux:0,uy:1,uz:0,sx:0,sy:0,sz:1,cx:0,cy:0,cz:0,tun
 const FULL=[.6,3.6,1.68],TIP=[.95,1.45,.3];
 function drawN700(tr,st){const head=st.s+tr.dir*tr.len/2,n=tr.cl.length;let acc=0;
  for(let c=0;c<n;c++){const L=tr.cl[c],cs=head-tr.dir*(acc+L/2);acc+=L+.6;const P=pose(tr,cs,PQ),h=L/2,k=1-.78*P.tun;
-  if(detailOK&&(P.cx-ORG.x)**2+(P.cy-ORG.y)**2+(P.cz-ORG.z)**2<DET2&&addDetailed(tr,c,n,P,k)){if(c===0)for(const z of[-N7L[1],N7L[1]])light(P,N7X,N7L[0],z,[5,5,4.6],4);if(c===n-1)for(const z of[-N7L[1],N7L[1]])light(P,-N7X,N7L[0],z,[4,.2,.1],3.5);continue;}
+  if(detailOK&&(P.cx-ORG.x)**2+(P.cy-ORG.y)**2+(P.cz-ORG.z)**2<DET2&&addDetailed(tr,c,n,P,k)){const lp=FAMS[tr.fam||'n7'].lamp,lx=lp[0]+(L-FAMS[tr.fam||'n7'].end)/2;if(c===0)for(const z of[-lp[2],lp[2]])light(P,lx,lp[1],z,[5,5,4.6],4);if(c===n-1)for(const z of[-lp[2],lp[2]])light(P,-lx,lp[1],z,[4,.2,.1],3.5);continue;}
   if(nv+44>MAXV||ni>=MAXI)return;
   const secs=c===0?[[-h,FULL],[h-9,FULL],[h,TIP]]:c===n-1?[[-h,TIP],[-h+9,FULL],[h,FULL]]:[[-h,FULL],[h,FULL]];let prev=null;
   for(const [x,s] of secs){const cr=[[x,s[0],-s[2]],[x,s[0],s[2]],[x,s[1],s[2]],[x,s[1],-s[2]]];for(let j=0;j<4;j++){wv(cr[j],P,k);wv(cr[(j+1)%4],P,k);if(prev){wv(prev[j],P,k);wv(cr[j],P,k);}}prev=cr;}
@@ -768,7 +812,7 @@ function dot(tr,st){if(np>=MAXP)return;atT(tr,st.s,latFor(tr,st.s),A);const i=np
 const RG_AH=26,RG_BH=26,RG_ST=1,RGN=(RG_AH+RG_BH)/RG_ST*2+8,rgPos=new Float32Array(RGN*6),rgCol=new Float32Array(RGN*6),rgG=new THREE.BufferGeometry();
 rgG.setAttribute('position',new THREE.BufferAttribute(rgPos,3).setUsage(THREE.DynamicDrawUsage));rgG.setAttribute('col',new THREE.BufferAttribute(rgCol,3).setUsage(THREE.DynamicDrawUsage));
 const rgMat=lineMat({nofade:true}),rgL=new THREE.LineSegments(rgG,rgMat);rgL.frustumCulled=false;scene.add(rgL);
-function railGlow(){const tr=FT,d=tr.dir,ax=(tr.hero?SPEC500.bog[0]:6.1)-1.25,head=fs.s+d*(tr.len/2-ax),tail=fs.s-d*(tr.len/2-ax);let n=0;const A2=[0,0,0],B2=[0,0,0];
+function railGlow(){const tr=FT,d=tr.dir,ax=(tr.hero?SPEC500.bog[0]:FAMS[tr.fam||'n7'].ax)-1.25,head=fs.s+d*(tr.len/2-ax),tail=fs.s-d*(tr.len/2-ax);let n=0;const A2=[0,0,0],B2=[0,0,0];
  const put=(a,b,c0,c1)=>{const i=n*6;rgPos.set(a,i);rgPos.set(b,i+3);rgCol.set(c0,i);rgCol.set(c1,i+3);n++;};
  const run=(s0,sg,L,c)=>{for(const g of[-.75,.75]){let pa=null,ka=0;for(let u=0;u<=L+1e-6;u+=RG_ST){const s=s0+sg*u;atT(tr,s,latFor(tr,s)+g,A2);A2[1]+=.06;
    const f=1-u/L,k=f*f*(tunT(tr,s)>.5?.6:1)*(1-ovf);if(pa)put(pa,A2.slice(),mul(c,ka),mul(c,k));pa=A2.slice();ka=k;}}};
@@ -887,7 +931,7 @@ function platCam(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,sc=PC[k]+sd*60,o=trk(sc),
 const OB={view:'front',yaw:0,pitch:0,fov:62},OBP={},OBV=[0,0,0];
 function carPose(tr,s,c,o){let acc=0;for(let i=0;i<c;i++)acc+=tr.cl[i]+.6;return pose(tr,s+tr.dir*(tr.len/2-acc-tr.cl[c]/2),o);}
 function boardCam(){const tr=FT,v=OB.view,n500=!!tr.hero;let P,lx,ly,lz,dx,dy,dz;
- if(v==='front'){P=FP0;lx=tr.cl[0]/2-(n500?6.4:5.7);ly=n500?2.6:2.72;lz=n500?-.3:-.35;dx=1;dy=-.035;dz=0;}
+ if(v==='front'){const cb=FAMS[tr.fam||'n7'].cab;P=FP0;lx=tr.cl[0]/2-(n500?6.4:cb[0]);ly=n500?2.6:cb[1];lz=n500?-.3:cb[2];dx=1;dy=-.035;dz=0;}
  else{const sd=v==='right'?1:-1;P=carPose(tr,fs.s,Math.min(2,tr.cl.length-1),OBP);lx=.53;ly=2.42;lz=sd*1.25;dx=.18;dy=-.04;dz=sd;}
  const cy=Math.cos(OB.yaw),sy=Math.sin(OB.yaw);let ax=dx*cy-dz*sy,az=dx*sy+dz*cy,ay=dy+OB.pitch;
  const wx=P.cx+lx*P.fx+ly*P.ux+lz*P.sx,wy=P.cy+lx*P.fy+ly*P.uy+lz*P.sy,wz=P.cz+lx*P.fz+ly*P.uz+lz*P.sz;cam.position.set(wx,wy,wz);

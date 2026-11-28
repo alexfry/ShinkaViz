@@ -77,21 +77,28 @@ def parse(page):
     for t in trains:
         t['cells'] = [(st, cells[t['col']] if t['col'] < len(cells) else '') for st, cells in table]
     has = lambda t: [any(x is not None for x in times(c)) for st, c in t['cells']]
-    lead = max(trains, key=lambda t: sum(has(t)))
+    # the train whose column carries the split (分割) or join (併合/併結/連結) mark is the one drawn blank over the shared stretch:
+    # before the mark when it splits off, after it when it joins
+    SPLIT, JOIN = r'分割|切離|解放', r'併合|併結|連結'
+    mark = {}
+    for t in trains:
+        for i, (st, c) in enumerate(t['cells']):
+            if re.search(SPLIT, c): mark[id(t)] = ('split', i)
+            elif re.search(JOIN, c): mark[id(t)] = ('join', i)
+    marked = [t for t in trains if id(t) in mark]
+    lead = next((t for t in trains if id(t) not in mark), None) if marked else max(trains, key=lambda t: sum(has(t)))
     for t in trains:
         H = has(t); own = [i for i, h in enumerate(H) if h]
         if not own: continue
-        lo, hi = own[0], own[-1]
         for i, (st, c) in enumerate(t['cells']):
             tm = times(c)
-            if t is not lead:
+            if lead is not None and t is not lead and id(t) in mark:
+                kind, m = mark[id(t)]
                 L = times(lead['cells'][i][1])
-                shared_before = i < lo and c == '' and all(t['cells'][k][1] == '' for k in range(i, lo))
-                shared_after = i > hi and c == '' and all(t['cells'][k][1] == '' for k in range(hi + 1, i + 1))
-                if shared_before or shared_after:
+                if c == '' and ((kind == 'split' and i < m) or (kind == 'join' and i > m)):
                     tm = L
-                elif i == lo and tm[0] is None and lo > 0 and t['cells'][lo - 1][1] == '': tm[0] = L[0]     # 分割: arrives with the lead
-                elif i == hi and tm[1] is None and hi < len(H) - 1 and t['cells'][hi + 1][1] == '': tm[1] = L[1]  # 併合: leaves with it
+                elif i == m and kind == 'split' and tm[0] is None: tm[0] = L[0]      # arrives with the lead, then parts
+                elif i == m and kind == 'join' and tm[1] is None: tm[1] = L[1]       # joins, then leaves with it
             if tm[0] is not None or tm[1] is not None:
                 t['stops'].append([st, tm[0], tm[1]])
         last = -1
