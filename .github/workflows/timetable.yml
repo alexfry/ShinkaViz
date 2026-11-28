@@ -25,7 +25,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
 
@@ -34,10 +34,6 @@ jobs:
           ARGS=""
           if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
           python3 tools/build_timetable.py $ARGS --dump tools/.cache/pages --show 3
-
-      - name: Explore JR East's timetable site (log only)
-        continue-on-error: true
-        run: python3 tools/explore_jreast.py
 
       - name: Keep a sample of the raw pages (for checking the parser)
         if: always()

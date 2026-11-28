@@ -147,6 +147,7 @@ def main():
     ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'data', 'sanyo-timetable.js'))
     ap.add_argument('--dump', default=None)
     ap.add_argument('--min', type=int, default=150, help='refuse to write fewer trains than this')
+    ap.add_argument('--no-east', action='store_true', help="skip JR East's site")
     ap.add_argument('--delay', type=float, default=0.7)
     ap.add_argument('--show', type=int, default=0, help='print the text of the first N train pages (for checking the parser)')
     a = ap.parse_args()
@@ -181,13 +182,33 @@ def main():
         t['id'] = tid
         trains.append(t)
         if n % 25 == 0: print(f'  {n + 1}/{len(ids)} {t["name"]}{t["num"]} {t["stock"]} {len(t["stops"])} stops', flush=True)
+    if not a.no_east:
+        try:
+            import build_jreast
+            have = {(t['type'], t['num']): t for t in trains}
+            added = 0
+            for t in build_jreast.collect(a.date, a.delay, a.show):
+                t['stops'] = [s for s in t['stops'] if s[0] in NETWORK]
+                if len(t['stops']) < 2: continue
+                t['dir'] = 1 if t['num'] % 2 else -1
+                o = have.get((t['type'], t['num']))
+                if o is not None:          # JR West already has it (Hokuriku through trains): keep the longer record
+                    if len(t['stops']) > len(o['stops']): o['stops'] = t['stops']
+                    o['stock'] = o['stock'] or t['stock']; o['cars'] = o['cars'] or t['cars']
+                    if t.get('couple'): o['couple'] = t['couple']
+                    continue
+                have[(t['type'], t['num'])] = t; trains.append(t); added += 1
+            print(f'JR East added {added} trains', flush=True)
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            print('JR East failed; writing JR West trains only', flush=True)
     trains.sort(key=lambda t: (t['stops'][0][2] or t['stops'][0][1] or 0))
     print(f'{len(trains)} trains, {bad} unreadable')
     if len(trains) < a.min:
         sys.exit(f'only {len(trains)} trains read (minimum {a.min}); not writing {a.out}')
     d = a.date
     doc = {'date': f'{d[:4]}-{d[4:6]}-{d[6:]}', 'generated': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%MZ'),
-           'source': 'JR West timetable (timetable.jr-odekake.net)', 'trains': trains}
+           'source': 'JR West (timetable.jr-odekake.net) and JR East (timetables.jreast.co.jp) timetables', 'trains': trains}
     with open(a.out, 'w') as f:
         f.write('/* Sanyo Shinkansen timetable for one day, built by tools/build_timetable.py. stops: [station, arrival s, departure s] (seconds after midnight JST; after-midnight times run past 86400). */\n')
         f.write('window.SANYO_TT=' + json.dumps(doc, ensure_ascii=False, separators=(',', ':')) + ';\n')
