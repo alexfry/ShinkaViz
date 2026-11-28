@@ -46,7 +46,8 @@ body{font:14px/1.35 "Chakra Petch","Noto Sans JP",system-ui,sans-serif}
 .seg button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 label.sl{display:flex;align-items:center;gap:8px;color:var(--dim);background:rgba(0,10,20,.65);border:1px solid var(--line);border-radius:6px;padding:0 10px;min-height:42px}
 input[type=range]{width:110px;accent-color:var(--acc)}
-.pop{position:relative}.pop summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:42px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65)}
+.pop{position:relative}#fsBtn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;min-width:44px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65);color:var(--ink);cursor:pointer}#fsBtn.on{background:rgba(92,200,255,.24)}#fsBtn[hidden]{display:none}
+.pop summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:42px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:rgba(0,10,20,.65)}
 .pop summary::-webkit-details-marker{display:none}.pop[open] summary{background:rgba(92,200,255,.24);color:#fff}
 .pop summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 #layerList{position:absolute;bottom:50px;left:0;z-index:2;display:grid;gap:2px;padding:8px 10px;min-width:220px;background:rgba(0,8,16,.92);border:1px solid var(--line);border-radius:6px}
@@ -59,7 +60,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
 #hud,#ui{transition:opacity .9s ease}body.calm #hud,body.calm #ui{opacity:0;pointer-events:none}body.calm #c{cursor:none}
 #msg{position:fixed;inset:0;display:grid;place-items:center;color:var(--dim);font-size:15px;pointer-events:none;padding:20px;text-align:center}
 @media(max-width:600px){.grp .ico{display:inline-flex}.grp>.seg{display:none;position:absolute;left:0;bottom:calc(100% + 6px);flex-direction:column;z-index:3;background:rgba(0,8,16,.92);min-width:150px}.grp.open>.seg{display:flex}.grp>.seg button{border-right:0;border-bottom:1px solid var(--line);text-align:left}.grp>.seg button:last-child{border-bottom:0}
- #camGrp{order:1}#timeGrp{order:2}#layers{order:3}#trainWrap,#obUi,#platUi{order:4}#note{order:5}#trainWrap{flex-basis:100%}#trainSel{max-width:100%;width:100%}
+ #camGrp{order:1}#timeGrp{order:2}#layers{order:3}#fsBtn{order:3}#trainWrap,#obUi,#platUi{order:4}#note{order:5}#trainWrap{flex-basis:100%}#trainSel{max-width:100%;width:100%}
  #clock{font-size:20px}#hero{font-size:12px}#hero h1{font-size:13px}input[type=range]{width:72px}.seg button{padding:0 9px}label.sl{padding:0 8px;font-size:13px}}
 </style>
 </head>
@@ -82,6 +83,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
   <div class="grp" id="timeGrp"><button class="ico" aria-label="Time speed" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg><span class="cur"></span></button><div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div></div>
+  <button id="fsBtn" aria-label="Full screen" title="Full screen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><label><input type="checkbox" id="calm"><span>集中 Distraction-free</span></label><hr></div></details>
       <div id="note"><span id="credit" hidden>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span> <details id="about"><summary>ⓘ About</summary><span class="body"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.<br><span id="credFull">Map data © OpenStreetMap contributors.</span></span></details></div>
 </div>
@@ -1071,7 +1073,7 @@ const tele=d=>Math.min(50,Math.max(4,2*Math.atan(24/d)*180/Math.PI));
 const SHOTS={
  flyby:{ja:'通過',en:'Flyby',ok:()=>fs.stop<0,
   start(){let s=heroHead()+FT.dir*(260+Math.random()*200);for(let k=0;k<12&&tunT(FT,s)>.5;k++)s+=FT.dir*300;cine.s=Math.min(Math.max(s,-300),FT.R.U+300);const mv=[[7+Math.random()*4,0,.3],[1.5,0,1.8+Math.random()*.8],[2,0,-1.6],[2.5,-2.2,.15]][Math.random()*4|0];cine.mv=mv;cine.sb=cine.s;beside(cine.s,(mv[1]<0?18:12)+Math.random()*10,mv[2]<0?9+Math.random()*4:1.5+Math.random()*3,cine.p);},
-  upd(t){cam.position.fromArray(moved(t));aimRel(autoEnd(cine.s),1.8);cam.fov=Math.min(65,Math.max(40,tele(cam.position.distanceTo(T))*2.4));return FT.dir*(heroHead()-FT.dir*FT.len-cine.s)>70||t>13;}},
+  upd(t){cam.position.fromArray(moved(t));aimRel(autoEnd(cine.s),1.8);cam.fov=Math.min(55,Math.max(28,tele(cam.position.distanceTo(T))*1.6));return FT.dir*(heroHead()-FT.dir*FT.len-cine.s)>70||t>13;}},
  track:{ja:'並走',en:'Tracking',ok:()=>fs.stop<0,start(){cine.u=Math.random()<.5?0:1;},
   upd(t){const f=Math.min(1,t/10),u=cine.u?1-f:f,s=heroHead()-FT.dir*FT.len*(.95-.85*u);cam.position.fromArray(beside(s,13,2.2,Q));T.fromArray(onTrain(s+FT.dir*35,1.8,Q2));cam.fov=40;return t>10;}},
  catch:{ja:'追いつく',en:'Aerial, catching up',ok:()=>fs.stop<0&&fs.v>40,
@@ -1080,10 +1082,26 @@ const SHOTS={
  leave:{ja:'置き去り',en:'Aerial, left behind',ok:()=>fs.stop<0&&fs.v>40,
   start(){cine.v=Math.max(0,fs.v-30);cine.s0=heroHead()+FT.dir*40;cine.sim0=simT;cine.h=60+Math.random()*50;cine.lat=40+Math.random()*25;},
   upd(t){const s=cine.s0+FT.dir*cine.v*(simT-cine.sim0);cam.position.fromArray(beside(s,cine.lat,cine.h,Q));aimRel(REL.tail()-20,1.8);cam.fov=38;return t>14||FT.dir*(fs.s-FT.dir*FT.len/2-s)>700;}},
- /* the long lens belongs far from the line: 450-900 m off to one side, a little raised, panning to follow the head */
- far:{ja:'望遠',en:'Long lens',ok:()=>fs.stop<0,
-  start(){cine.s=heroHead()+FT.dir*(150+Math.random()*250);cine.lat=450+Math.random()*450;cine.h=8+Math.random()*35;beside(cine.s,cine.lat,cine.h,cine.p);},
-  upd(t){cam.position.fromArray(cine.p);aimRel(REL.head()+15,1.8);cam.fov=Math.min(14,Math.max(2.5,tele(cam.position.distanceTo(T))*1.6));return t>11;}},
+ /* long lenses belong well off to the side, looking across the line, so the train is seen side-on and the land behind it streams
+    past. side: a fixed camera 200-700 m out that pans as the train crosses in front of it, framing two or three cars */
+ side:{ja:'望遠',en:'Long lens, side-on',ok:()=>fs.stop<0&&fs.v>25,
+  start(){cine.s=heroHead()+FT.dir*(30+Math.random()*90);cine.lat=200+Math.random()*500;cine.h=4+Math.random()*22;beside(cine.s,cine.lat,cine.h,cine.p);cine.f=.15+Math.random()*.35;},
+  upd(t){cam.position.fromArray(cine.p);const r=Math.min(FT.len-30,Math.max(15,FT.dir*(heroHead()-cine.s)*.6+15));aimRel(r,1.8);
+   cam.fov=Math.max(2,2*Math.atan(32/cam.position.distanceTo(T))*180/Math.PI);return t>12||FT.dir*(heroHead()-FT.len-cine.s)>60;}},
+ /* pace: the camera keeps pace with the train 250-500 m out (a car on a parallel road), long lens on the leading cars */
+ pace:{ja:'並走望遠',en:'Pacing, long lens',ok:()=>fs.stop<0&&fs.v>40,
+  start(){cine.back=10+Math.random()*60;cine.lat=250+Math.random()*250;cine.h=6+Math.random()*30;},
+  upd(t){const s=heroHead()-FT.dir*cine.back;cam.position.fromArray(beside(s-FT.dir*cine.lat*.25,cine.lat,cine.h,Q));aimRel(cine.back+10,1.8);
+   cam.fov=Math.max(2,2*Math.atan(30/cam.position.distanceTo(T))*180/Math.PI);return t>11;}},
+ /* on board: the driver's view from the cab, or a window seat (third car), with a slow look around */
+ onboard:{ja:'車内',en:'On board',ok:()=>fs.stop<0&&fs.v>30,start(){const r=Math.random();cine.ob=r<.55?'front':r<.78?'left':'right';},
+  upd(t){const tr=FT,n500=!!tr.hero,v=cine.ob;let P,lx,ly,lz,dx,dy,dz;
+   if(v==='front'){const cb=FAMS[tr.fam||'n7'].cab;P=FP0;lx=tr.cl[0]/2-(n500?6.4:cb[0]);ly=n500?2.6:cb[1];lz=n500?-.3:cb[2];dx=1;dy=-.035;dz=0;}
+   else{const sd=v==='right'?1:-1;P=carPose(tr,fs.s,Math.min(2,tr.cl.length-1),OBP);lx=.53;ly=2.42;lz=sd*1.25;dx=.18;dy=-.04;dz=sd;}
+   const yw=.12*Math.sin(t*.35),cy=Math.cos(yw),sy=Math.sin(yw),ax=dx*cy-dz*sy,az=dx*sy+dz*cy,ay=dy;
+   const wx=P.cx+lx*P.fx+ly*P.ux+lz*P.sx,wy=P.cy+lx*P.fy+ly*P.uy+lz*P.sy,wz=P.cz+lx*P.fz+ly*P.uz+lz*P.sz;cam.position.set(wx,wy,wz);
+   T.set(wx+(ax*P.fx+ay*P.ux+az*P.sx)*100,wy+(ax*P.fy+ay*P.uy+az*P.sy)*100,wz+(ax*P.fz+ay*P.uz+az*P.sz)*100);cam.up.set(P.ux,P.uy,P.uz);
+   cam.fov=62;HCUT.value=v==='front'?14:20;return t>11;}},
  heli:{ja:'空撮',en:'Aerial',ok:()=>true,start(){},
   upd(t){const P=aimRel(cine.end,0),a=cine.yaw+t*.07;cam.position.set(P[0]+Math.cos(a)*380,P[1]+170,P[2]+Math.sin(a)*380);cam.fov=32;return t>13;}},
  nose:{ja:'先頭',en:'Nose',ok:()=>fs.stop<0,start(){},
@@ -1092,7 +1110,7 @@ const SHOTS={
   upd(t){const P=aimRel(cine.end,0);cam.position.set(P[0]-FP0.fx*60,P[1]+240-t*4,P[2]-FP0.fz*60);cam.fov=38;return t>8;}},
  portal:{ja:'トンネル',en:'Tunnel portal',ok:()=>fs.stop<0&&findPortal()!==null,
   start(){cine.s=findPortal();cine.sb=cine.s-FT.dir*120;cine.mv=[1.6,0,1.3];beside(cine.sb,14,4,cine.p);},
-  upd(t){cam.position.fromArray(moved(t));aimRel(Math.max(REL.head(),FT.dir*(heroHead()-cine.s)+6),1.8);cam.fov=Math.min(60,Math.max(36,tele(cam.position.distanceTo(T))*2.4));return FT.dir*(heroHead()-cine.s)>FT.len+20||t>25;}},
+  upd(t){cam.position.fromArray(moved(t));aimRel(Math.max(REL.head(),FT.dir*(heroHead()-cine.s)+6),1.8);cam.fov=Math.min(55,Math.max(28,tele(cam.position.distanceTo(T))*1.6));return FT.dir*(heroHead()-cine.s)>FT.len+20||t>25;}},
  arrive:{ja:'到着',en:'Arrival',ok:()=>{const ne=FT.ev[fs.i+1];return fs.stop<0&&!!ne&&(ne.arr-simT)/Math.max(speed,1)<15;},
   start(){const ne=FT.ev[fs.i+1],k=ne.k,o=FT.type==='kodama'&&stations[k].major?13.6:9.7;cine.k=k;cine.sb=ne.s+FT.dir*(FT.len/2+25);cine.mv=[1.1,0,.12];cine.s=ne.s;atT(FT,ne.s+FT.dir*(FT.len/2+25),o,cine.p);cine.p[1]+=2.85;},
   upd(t){cam.position.fromArray(moved(t));aimRel(REL.head(),1.6);const d=cam.position.distanceTo(T);cam.fov=Math.min(55,Math.max(32,tele(d)*2.2));return(fs.stop===cine.k&&t>6)||t>25;}},
@@ -1101,7 +1119,7 @@ const SHOTS={
   upd(t){cam.position.fromArray(moved(t));T.set(FP0.cx-FP0.fx*30,FP0.cy+2,FP0.cz-FP0.fz*30);cam.fov=50;return(fs.stop<0&&t>3)||t>16;}},
 };
 function nextShot(now){if(SHOTS.arrive.ok()&&cine.last!=='arrive'){cine.shot=cine.last='arrive';cine.side=1;cine.t0=now;cine.ar=null;SHOTS.arrive.start();clearP=true;$('#shot').textContent=`${SHOTS.arrive.ja} ${SHOTS.arrive.en}`;return;}
- const pool=fs.stop>=0?['station','heli','top']:['flyby','track','heli','nose','top','portal','catch','leave','far','flyby'];
+ const pool=fs.stop>=0?['station','heli','top']:['side','pace','track','side','heli','nose','pace','top','portal','catch','leave','flyby','onboard'];
  let c=pool.filter(k=>k!==cine.last&&SHOTS[k].ok());if(!c.length)c=['heli'];
  startShot(c.includes('portal')&&Math.random()<.5?'portal':c.includes('station')?'station':c[Math.random()*c.length|0],now);}
 function startShot(k,now){cine.shot=k;
@@ -1111,7 +1129,11 @@ function startShot(k,now){cine.shot=k;
 /* Tour: cinematic shots that hop between trains wherever something is happening (an arrival or departure, a tunnel portal
    coming up, flat-out running, passing a landmark), preferring trains near the current one so the camera's flight between
    them stays short. Between trains the camera flies an arc from where it is to the next shot's opening position. */
-const TOUR={on:false,n:0,max:2,fly:null,recent:[],why:''};
+/* full screen (where the browser allows it; iPhone Safari doesn't, so the button hides there) */
+{const b=document.getElementById('fsBtn'),el=document.documentElement,can=!!(el.requestFullscreen||el.webkitRequestFullscreen);if(!can)b.hidden=true;
+ b.addEventListener('click',()=>{const on=document.fullscreenElement||document.webkitFullscreenElement;if(on)(document.exitFullscreen||document.webkitExitFullscreen).call(document);else(el.requestFullscreen||el.webkitRequestFullscreen).call(el);});
+ const upd=()=>b.classList.toggle('on',!!(document.fullscreenElement||document.webkitFullscreenElement));document.addEventListener('fullscreenchange',upd);document.addEventListener('webkitfullscreenchange',upd);}
+const TOUR={on:true,n:2,max:2,fly:null,recent:[],why:'',hops:0};
 const LANDMARK_JA=['東京','新横浜','名古屋','京都','新大阪','広島','博多','新富士','浜松','新下関','仙台','盛岡','新青森','奥津軽いまべつ','新函館北斗','大宮','高崎','長野','金沢','新潟','鹿児島中央','長崎'];
 const LANDMARK_EN={'新富士':'Mt Fuji','浜松':'Lake Hamana','新下関':'the Kanmon Strait','奥津軽いまべつ':'the Seikan Tunnel'};
 function tourEvent(tr,st){const v=st.v*3.6,ne=tr.ev[st.i+1],sp=Math.max(speed,1),k=tr.ks?null:null;
@@ -1130,8 +1152,20 @@ function tourHop(now){const pk=tourPick();if(!pk){TOUR.n=0;nextShot(now);return;
  setFocus(tr);mode='cine';TOUR.n=0;
  if(ev.shot==='arrive'&&SHOTS.arrive.ok())startShot('arrive',now);else if(SHOTS[ev.shot]&&SHOTS[ev.shot].ok())startShot(ev.shot,now);else nextShot(now);
  const w=ev.why,nm=tName(tr);TOUR.why=`${w[0]} ${w[1]}${w[2]?' · '+w[2].name:''} — ${nm[1]}`;
- TOUR.fly={p0,t0,f0,t:now,dur:Math.min(14,Math.max(5,4+d/25000))*1000};}
-function tourCam(now){
+ TOUR.hops++;const big=TOUR.hops>=3&&Math.random()<.4;if(big)TOUR.hops=0;
+ TOUR.fly={p0,t0,f0,t:now,dur:Math.min(14,Math.max(5,4+d/25000))*1000,big};
+ if(big){const D=overDist(),a=1.5;TOUR.fly.O=new THREE.Vector3(CX,D*Math.sin(a),CZ+D*Math.cos(a));TOUR.fly.OT=new THREE.Vector3(CX,0,CZ);TOUR.fly.dur=22000;TOUR.why='全体 Overview → '+TOUR.why;}}
+function tourCam(now){if(TOUR.fly&&!cine.shot)TOUR.fly=null;   /* a train picked by hand mid-flight cancels the flight */
+ if(TOUR.fly&&TOUR.fly.big){const F=TOUR.fly,u=Math.min(1,(now-F.t)/F.dur),sm=x=>{x=Math.min(1,Math.max(0,x));return x*x*x*(x*(x*6-15)+10);};
+  /* out to the whole network (35%), hold (25%), back down to the next train (40%); height eases on a log scale */
+  cine.t0=now;SHOTS[cine.shot].upd(0);const p1=cam.position.clone(),t1=T.clone(),f1=cam.fov;let A,B,AT,BT,e,fa,fb;
+  if(u<.35){A=F.p0;AT=F.t0;B=F.O;BT=F.OT;e=sm(u/.35);fa=F.f0;fb=50;}else if(u<.6){A=B=F.O;AT=BT=F.OT;e=0;fa=fb=50;}else{A=F.O;AT=F.OT;B=p1;BT=t1;e=sm((u-.6)/.4);fa=50;fb=f1;}
+  /* interpolate as an orbit: target, log distance, pitch and heading, so the camera always looks down at where it is going */
+  const orb=(P,Tg)=>{const x=P.x-Tg.x,y=P.y-Tg.y,z=P.z-Tg.z,r=Math.max(1,Math.hypot(x,y,z));return [Math.log(r),Math.asin(Math.max(-1,Math.min(1,y/r))),Math.atan2(z,x)];};
+  const oa=orb(A,AT),ob=orb(B,BT),r=Math.exp(oa[0]+(ob[0]-oa[0])*e),pt2=oa[1]+(ob[1]-oa[1])*e,yw=lerpA(oa[2],ob[2],e);
+  T.lerpVectors(AT,BT,e);cam.position.set(T.x+Math.cos(yw)*Math.cos(pt2)*r,T.y+Math.sin(pt2)*r,T.z+Math.sin(yw)*Math.cos(pt2)*r);cam.fov=fa+(fb-fa)*e;
+  const dd=cam.position.distanceTo(T);$('#shot').textContent=TOUR.why;if(u>=1){TOUR.fly=null;cine.t0=now;}
+  cam.near=Math.max(.5,dd*.02);cam.far=dd*5+160000;ovf=ss(20000,300000,dd);U.uFadeNear.value=Math.max(30000,dd*3);U.uFadeFar.value=Math.max(150000,dd*6);return;}
  if(TOUR.fly){const F=TOUR.fly,u=Math.min(1,(now-F.t)/F.dur),e=u*u*u*(u*(u*6-15)+10),lift=Math.pow(Math.sin(Math.PI*u),1.5);   /* smootherstep travel, a soft rise and fall */
   cine.t0=now;SHOTS[cine.shot].upd(0);const p1=cam.position.clone(),t1=T.clone(),f1=cam.fov,dist=F.p0.distanceTo(p1);
   cam.position.lerpVectors(F.p0,p1,e);cam.position.y+=Math.min(dist*.3,25000)*lift;T.lerpVectors(F.t0,t1,e);
@@ -1140,9 +1174,9 @@ function tourCam(now){
   cam.near=Math.max(.5,cam.position.distanceTo(T)*.02);cam.far=300000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;return;}
  const done=!cine.shot||SHOTS[cine.shot].upd((now-cine.t0)/1000);
  if(done){TOUR.n++;if(TOUR.n>=TOUR.max){tourHop(now);if(TOUR.fly)return tourCam(now);}else{nextShot(now);const sh=SHOTS[cine.shot],nm=tName(FT);$('#shot').textContent=`${sh.ja} ${sh.en} — ${nm[1]}`;}SHOTS[cine.shot].upd(0);}
- cam.near=Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
+ cam.near=cine.shot==='onboard'?.12:Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
 function cineCam(now){if(TOUR.on)return tourCam(now);if(!cine.shot||(cine.shot!=='arrive'&&cine.shot!=='station'&&SHOTS.arrive.ok()&&cine.last!=='arrive'))nextShot(now);if(SHOTS[cine.shot].upd((now-cine.t0)/1000)){nextShot(now);SHOTS[cine.shot].upd(0);}
- cam.near=Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
+ cam.near=cine.shot==='onboard'?.12:Math.max(.5,cam.position.distanceTo(T)*.05);cam.far=160000;ovf=0;U.uFadeNear.value=30000;U.uFadeFar.value=150000;}
 /* platform: stand on a station platform; drag to look around, pinch to zoom */
 const PLAT_CAM={k:3,side:1,yaw:0,pitch:0,fov:55};
 function platCam(){const k=PLAT_CAM.k,sd=PLAT_CAM.side,sc=PC[k]+sd*60,o=trk(sc),tx=o.tx,tz=o.tz;
