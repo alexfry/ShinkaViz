@@ -20,4 +20,6 @@ for h in links[:60]:
         cells = re.findall(r'<td([^>]*)>(.*?)</td>', cal, re.S)
         sig = [(a.strip(), re.sub(r'\s+', ' ', c).strip()) for a, c in cells if re.search(r'\d', re.sub(r'<[^>]+>', '', c))]
         print('== day cells:', sig[:45])
+        q = p.find('時刻詳細'); raw = re.sub(r'\s+', ' ', re.sub(r'<script.*?</script>', '', p[q:q + 40000], flags=re.S))
+        print('== raw:', raw[raw.find('駅名') - 200:][:5000])
     if len(picked) >= 3: break
