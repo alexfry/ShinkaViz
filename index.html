@@ -82,7 +82,7 @@ input[type=range]{width:110px;accent-color:var(--acc)}
   <span class="seg" id="trainWrap"><select id="trainSel" aria-label="Train to follow"></select></span>
   <span id="platUi" class="seg" hidden><select id="plat" aria-label="Station"></select><button id="platSide"></button></span>
   <div class="grp" id="timeGrp"><button class="ico" aria-label="Time speed" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg><span class="cur"></span></button><div class="seg" id="speeds" role="group" aria-label="Time speed"><button data-s="1" class="on">1×</button><button data-s="10">10×</button><button data-s="60">60×</button><button data-s="300">300×</button></div></div>
-  <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">残光 Persistence <input type="range" id="pers" min="0" max="1.5" step="0.05" value="0"></label><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><label><input type="checkbox" id="calm"><span>集中 Distraction-free</span></label><hr></div></details>
+  <details id="layers" class="pop"><summary>表示 View</summary><div id="layerList"><label class="sl2">グロー Glow <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label><label><input type="checkbox" id="calm"><span>集中 Distraction-free</span></label><hr></div></details>
       <div id="note"><span id="credit" hidden>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span> <details id="about"><summary>ⓘ About</summary><span class="body"><span id="src"></span> <span id="procNote">Terrain is procedural and the timetable is an invented sample.</span><span id="liveNote" hidden>The timetable is an invented sample.</span> 500 series pantograph type and position are unverified. Drag to orbit, pinch or scroll to zoom.<br><span id="credFull">Map data © OpenStreetMap contributors.</span></span></details></div>
 </div>
 <div id="msg">Building scene…</div>
@@ -759,7 +759,7 @@ function mkRT(w,h,depth){const r=new THREE.WebGLRenderTarget(w,h,{type:RTT,forma
 const cam=new THREE.PerspectiveCamera(50,1,.3,130000);
 function resize(){const w=canvas.clientWidth||window.innerWidth,h=canvas.clientHeight||window.innerHeight;renderer.setSize(w,h,false);const v=new THREE.Vector2();renderer.getDrawingBufferSize(v);BW=v.x;BH=v.y;
  for(const r of[rtMain,rtTrain,...rtP,...lv.flatMap(l=>[l.a,l.b])])if(r)r.dispose();
- rtMain=mkRT(BW,BH,true);rtTrain=mkRT(BW,BH,true);rtP=[mkRT(BW,BH,false),mkRT(BW,BH,false)];lv=[];let lw=BW,lh=BH;
+ rtMain=mkRT(BW,BH,true);lv=[];let lw=BW,lh=BH;
  for(let i=0;i<5;i++){lw=Math.max(1,lw>>1);lh=Math.max(1,lh>>1);lv.push({a:mkRT(lw,lh,false),b:mkRT(lw,lh,false),w:lw,h:lh});}
  cam.aspect=w/h;clearP=true;}
 function pass(m,rt){quad.material=m;renderer.setRenderTarget(rt);renderer.render(qScene,qCam);}
@@ -916,7 +916,7 @@ function updModeUi(){const cur=mode==='cine'?'cine':mode==='plat'?'plat':mode===
  const lg=ovf>.5;if(lg!==legendShown){legendShown=lg;$('#legend').style.display=lg?'flex':'none';}
  trackMat.uniforms.uMul.value=1-.7*ovf;wireMat.uniforms.uMul.value=1-.92*ovf;patchMat.uniforms.uMul.value=1-ovf;for(const L of Object.values(layerObjs))L.mat.uniforms.uMul.value=1-.4*ovf;for(const m of Object.values(LTM.mats))m.uniforms.uMul.value=1-.4*ovf;}
 $('#timeGrp .cur').textContent='1×';$('#speeds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.s;$('#timeGrp .cur').textContent=b.textContent;for(const x of document.querySelectorAll('#speeds button'))x.classList.toggle('on',x===b);});
-const pers=$('#pers'),glow=$('#glow');
+const glow=$('#glow');
 
 function setFocus(tr){if(lastHd!==null){ORB.yaw-=lastHd;lastHd=null;}FT=tr;
  {fs={s:0,v:0,stop:-1,i:0};FP0={...HP0};const st=stateAt(tr,simT,FSX);if(st){fs.s=st.s;fs.v=st.v;fs.stop=st.stop;fs.i=st.i;pose(tr,st.s+tr.dir*(tr.len/2-tr.cl[0]/2),FP0);}}
@@ -983,13 +983,12 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,Math.max(0
  updCam(now);updModeUi();liveUpdate(now);if(ovf<.9)patch(FP0.cx,FP0.cz);railGlow();
  hullMat.uniforms.uPix.value=1.5*DPR*2*Math.tan(cam.fov*Math.PI/360)/BH;
  renderer.setRenderTarget(rtMain);renderer.clear(true,true,false);cam.layers.enable(0);cam.layers.enable(1);renderer.render(scene,cam);
- renderer.setRenderTarget(rtTrain);renderer.clear(true,true,false);cam.layers.set(1);renderer.render(scene,cam);cam.layers.enable(0);
- const tau=+pers.value,prev=rtP[pi],cur=rtP[1-pi];pi=1-pi;
- mPersist.uniforms.tPrev.value=prev.texture;mPersist.uniforms.tCur.value=rtTrain.texture;mPersist.uniforms.uDecay.value=clearP||tau<.02?0:Math.exp(-dt/tau);clearP=false;pass(mPersist,cur);
- mDown0.uniforms.tA.value=rtMain.texture;mDown0.uniforms.tB.value=cur.texture;mDown0.uniforms.uT.value.set(1/BW,1/BH);pass(mDown0,lv[0].a);
+ /* one pass: trains share the depth buffer with everything else, so buildings, terrain and tunnels hide them */
+ clearP=false;
+ mDown0.uniforms.tA.value=rtMain.texture;mDown0.uniforms.tB.value=rtMain.texture;mDown0.uniforms.uT.value.set(1/BW,1/BH);pass(mDown0,lv[0].a);
  for(let i=0;i<lv.length;i++){const l=lv[i];if(i>0){const p=lv[i-1];mDown.uniforms.tS.value=p.a.texture;mDown.uniforms.uT.value.set(1/p.w,1/p.h);pass(mDown,l.a);}
   mBlur.uniforms.tS.value=l.a.texture;mBlur.uniforms.uD.value.set(1/l.w,0);pass(mBlur,l.b);mBlur.uniforms.tS.value=l.b.texture;mBlur.uniforms.uD.value.set(0,1/l.h);pass(mBlur,l.a);}
- const fu=mFinal.uniforms;fu.tMain.value=rtMain.texture;fu.tP.value=cur.texture;fu.b1.value=lv[0].a.texture;fu.b2.value=lv[1].a.texture;fu.b3.value=lv[2].a.texture;fu.b4.value=lv[3].a.texture;fu.b5.value=lv[4].a.texture;fu.uGlow.value=+glow.value;pass(mFinal,null);
+ const fu=mFinal.uniforms;fu.tMain.value=rtMain.texture;fu.tP.value=rtMain.texture;fu.b1.value=lv[0].a.texture;fu.b2.value=lv[1].a.texture;fu.b3.value=lv[2].a.texture;fu.b4.value=lv[3].a.texture;fu.b5.value=lv[4].a.texture;fu.uGlow.value=+glow.value;pass(mFinal,null);
  updLabels();if(now-hudT>120){hudT=now;updHud();}}
 window.addEventListener('resize',resize);
 {const box=$('#layerList'),items=[['terrain',LIVE?{ja:'地形',en:'Terrain',c:[.1,.4,.5],k:1}:{ja:'地形 (仮)',en:'Terrain (placeholder)',c:[.1,.4,.5],k:1}],...Object.entries(CTXL).filter(([k])=>LIVE?LIVE_LAYERS.includes(k):layerObjs[k])];
